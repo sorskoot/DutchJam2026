@@ -176,15 +176,15 @@ or break.
 
 ### TODO
 
--[ ] Set up project
-    - [ ] Create Main scene
-    - [ ] Set up basic camera
-    - [ ] Create player bus placeholder
-    - [ ] Add controls.
-    - [ ] Create first basic game loop
--[ ] Add to GitHub 
+-[x] Set up project
+    - [x] Create Main scene
+    - [x] Set up basic camera
+    - [x] Create player bus placeholder
+    - [x] Add controls.
+    - [x] Create first basic game loop
+-[x] Add to GitHub 
 -[ ] Set up highway
--[ ] Add bus model or placeholder box
+-[x] Add bus model or placeholder box
 -[ ] Implement forward movement + steering
 -[ ] Add speedometer UI
 -[ ] Implement speed bomb logic

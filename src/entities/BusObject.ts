@@ -1,11 +1,11 @@
-import {Mesh, Vector3} from '@babylonjs/core';
-import {AssetManager, type Game, GameObject, type GameScene, metadataRepository} from '@sorskoot/babylon-kit';
+import {TransformNode, Vector3} from '@babylonjs/core';
+import {type Game, GameObject, type GameScene} from '@sorskoot/babylon-kit';
 
 export class BusObject extends GameObject {
     constructor(
         scene: GameScene,
         game: Game,
-        bus:Mesh,
+        bus:TransformNode,
     ) {
         super("Bus", game, scene);
 
