@@ -1,0 +1,27 @@
+{
+    "name": "game05",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "preview": "vite preview",
+        "assets": "assetpack",
+        "assets:watch": "assetpack -w"
+    },
+    "devDependencies": {
+        "@assetpack/core": "^1.7.0",
+        "@types/webxr": "^0.5.24",
+        "fbx2gltf": "0.9.7-p1",
+        "typescript": "^6.0.2",
+        "vite": "^8.0.8"
+    },
+    "dependencies": {
+        "@babylonjs/core": "^9.1.0",
+        "@babylonjs/gui": "^9.1.0",
+        "@babylonjs/inspector": "^9.1.0",
+        "@babylonjs/loaders": "^9.1.0",
+        "@sorskoot/babylon-kit": "file:../BJS-GameEngine/sorskoot-babylon-kit-0.1.2.tgz"
+    }
+}
