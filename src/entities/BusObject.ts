@@ -28,10 +28,10 @@ export class BusObject extends GameObject {
 
     public onUpdate(_deltaTime: number): void {
         if (this.scene.getInputManager().isActionHeld("left")) {
-            this.position.x -= .1;
+            this.position.x -= .5;
         }
         if (this.scene.getInputManager().isActionHeld("right")) {
-            this.position.x += .1;
+            this.position.x += .5;
         }
     }
 
