@@ -1,4 +1,4 @@
-import {Color3, Mesh, MeshBuilder, Scene, StandardMaterial, Vector3} from '@babylonjs/core';
+import {Color3, Matrix, Mesh, MeshBuilder, Scene, StandardMaterial} from '@babylonjs/core';
 import {rng} from '../utils/rng.ts';
 import {SystemBase} from './SystemBase.ts';
 
@@ -24,12 +24,15 @@ export interface TilePoint {
 }
 
 interface TileRow {
-    meshes: Mesh[]; // one mesh per lane, index 0-4; may be disabled
-    z: number; // current world Z of this row's centre
+    /** Whether each lane slot is active; index 0-4 maps to LANE_X. */
+    enabled: boolean[];
+    /** Current world Z of this row's centre. */
+    z: number;
 }
 
 /**
  * Creates and scrolls a pool of flat box tiles arranged in 5 lanes.
+ * All tiles share a single GPU-instanced mesh (thin instances) to minimise draw calls.
  * Gaps are generated randomly each time a row is recycled.
  */
 export class TileScrollingSystem extends SystemBase {
@@ -37,54 +40,84 @@ export class TileScrollingSystem extends SystemBase {
     public speed: number = INITIAL_SPEED;
 
     private readonly rows: TileRow[] = [];
+    private readonly tileMesh: Mesh;
+
+    // -={ Thin-instance helpers }=──────────────────────────────────────────._
+    /** Zero matrix — scales a thin instance to nothing, effectively hiding it. */
+    private static readonly HIDDEN_MATRIX: Matrix = Matrix.Zero();
+    /** Scratch matrix used in hot paths to avoid per-frame allocations. */
+    private readonly tmpMatrix: Matrix = Matrix.Identity();
 
     constructor(scene: Scene) {
         super();
 
-        // Shared material for all tiles
+        // -={ Material }=───────────────────────────────────────────────────._
         const mat = new StandardMaterial('tileMat', scene);
         mat.diffuseColor = new Color3(0.15, 0.45, 0.95);
         mat.specularColor = new Color3(0.4, 0.6, 1.0);
         mat.emissiveColor = new Color3(0.05, 0.15, 0.35);
 
+        // -={ Master mesh }=────────────────────────────────────────────────._
+        // One box mesh – rendered N times via thin instances (1 draw call).
+        this.tileMesh = MeshBuilder.CreateBox(
+            'tile',
+            {width: TILE_WIDTH, height: TILE_HEIGHT, depth: TILE_DEPTH},
+            scene
+        );
+        this.tileMesh.material = mat;
+        this.tileMesh.isPickable = false;
+
+        // -={ Row initialisation }=─────────────────────────────────────────._
         for (let r = 0; r < NUM_ROWS; r++) {
             const rowZ = -(r * ROW_SPACING);
-            const meshes: Mesh[] = [];
+            const enabled = new Array<boolean>(LANE_X.length).fill(true);
+            this.rows.push({enabled, z: rowZ});
+            this.applyPattern(r, r < SAFE_ROWS);
+        }
 
+        // -={ Thin instances }=─────────────────────────────────────────────._
+        // Register every (row × lane) slot upfront; matrices updated per frame.
+        for (let r = 0; r < NUM_ROWS; r++) {
+            const row = this.rows[r];
             for (let lane = 0; lane < LANE_X.length; lane++) {
-                const mesh = MeshBuilder.CreateBox(
-                    `tile_r${r}_l${lane}`,
-                    {
-                        width: TILE_WIDTH,
-                        height: TILE_HEIGHT,
-                        depth: TILE_DEPTH,
-                    },
-                    scene
-                );
-                mesh.material = mat;
-                mesh.position = new Vector3(LANE_X[lane], TILE_Y, rowZ);
-                meshes.push(mesh);
+                const isLastInstance = r === NUM_ROWS - 1 && lane === LANE_X.length - 1;
+                if (row.enabled[lane]) {
+                    Matrix.TranslationToRef(LANE_X[lane], TILE_Y, row.z, this.tmpMatrix);
+                    this.tileMesh.thinInstanceAdd(this.tmpMatrix, isLastInstance);
+                } else {
+                    this.tileMesh.thinInstanceAdd(TileScrollingSystem.HIDDEN_MATRIX, isLastInstance);
+                }
             }
-
-            this.applyPattern(meshes, r < SAFE_ROWS);
-            this.rows.push({meshes, z: rowZ});
         }
     }
 
-    // ── Helpers ─────────────────────────────────────────────────────────────
+    // -={ Helpers }=────────────────────────────────────────────────────────._
 
-    /** Enable/disable individual lane tiles for one row. */
-    private applyPattern(meshes: Mesh[], forceAll: boolean): void {
+    /** Returns the flat thin-instance index for a given row/lane pair. */
+    private instanceIndex(row: number, lane: number): number {
+        return row * LANE_X.length + lane;
+    }
+
+    /**
+     * Writes the enabled flags for one row.
+     * Does NOT push matrices to the GPU — callers must do that via
+     * {@link syncRowMatrices} or the bulk update in {@link update}.
+     */
+    private applyPattern(rowIndex: number, forceAll: boolean): void {
+        const row = this.rows[rowIndex];
+
         if (forceAll) {
-            for (const m of meshes) m.setEnabled(true);
+            row.enabled.fill(true);
             return;
         }
 
         // Each lane: 65 % chance of having a tile
-        const enabled = meshes.map(() => rng.getUniform() < 0.65);
+        for (let i = 0; i < row.enabled.length; i++) {
+            row.enabled[i] = rng.getUniform() < 0.65;
+        }
 
         // Guarantee at least 2 tiles per row
-        let count = enabled.filter(Boolean).length;
+        let count = row.enabled.filter(Boolean).length;
         if (count < 2) {
             const order = [0, 1, 2, 3, 4];
             // Fisher-Yates shuffle using our seeded rng
@@ -93,45 +126,60 @@ export class TileScrollingSystem extends SystemBase {
                 [order[i], order[j]] = [order[j], order[i]];
             }
             for (const idx of order) {
-                if (!enabled[idx]) {
-                    enabled[idx] = true;
-                    if (++count >= 2) break;
+                if (!row.enabled[idx]) {
+                    row.enabled[idx] = true;
+                    if (++count >= 2) { break; }
                 }
             }
         }
+    }
 
-        for (let i = 0; i < meshes.length; i++) {
-            meshes[i].setEnabled(enabled[i]);
+    /**
+     * Pushes the current Z and enabled state of one row into the thin-instance
+     * matrix buffer.
+     *
+     * @param rowIndex - Index into {@link rows}.
+     * @param refresh - When true the GPU buffer is marked dirty immediately.
+     */
+    private syncRowMatrices(rowIndex: number, refresh: boolean): void {
+        const row = this.rows[rowIndex];
+        for (let lane = 0; lane < LANE_X.length; lane++) {
+            const isLast = refresh && lane === LANE_X.length - 1;
+            if (row.enabled[lane]) {
+                Matrix.TranslationToRef(LANE_X[lane], TILE_Y, row.z, this.tmpMatrix);
+                this.tileMesh.thinInstanceSetMatrixAt(this.instanceIndex(rowIndex, lane), this.tmpMatrix, isLast);
+            } else {
+                this.tileMesh.thinInstanceSetMatrixAt(this.instanceIndex(rowIndex, lane), TileScrollingSystem.HIDDEN_MATRIX, isLast);
+            }
         }
     }
 
-    // ── SystemBase ───────────────────────────────────────────────────────────
+    // -={ SystemBase }=─────────────────────────────────────────────────────._
 
     override update(deltaTime: number): void {
         // Current minimum Z used to place recycled rows at the far end
         let minZ = Number.POSITIVE_INFINITY;
         for (const row of this.rows) {
-            if (row.z < minZ) minZ = row.z;
+            if (row.z < minZ) { minZ = row.z; }
         }
 
-        for (const row of this.rows) {
+        for (let r = 0; r < this.rows.length; r++) {
+            const row = this.rows[r];
             row.z += this.speed * deltaTime;
 
             if (row.z > RECYCLE_THRESHOLD) {
                 // Push row to the back and generate a new gap pattern
                 row.z = minZ - ROW_SPACING;
                 minZ = row.z;
-                this.applyPattern(row.meshes, false);
+                this.applyPattern(r, false);
             }
 
-            // Sync mesh positions
-            for (const mesh of row.meshes) {
-                mesh.position.z = row.z;
-            }
+            // Sync all lane matrices for this row; flush GPU buffer on last row
+            this.syncRowMatrices(r, r === this.rows.length - 1);
         }
     }
 
-    // ── Public API ───────────────────────────────────────────────────────────
+    // -={ Public API }=─────────────────────────────────────────────────────._
 
     /**
      * Resets all rows to their initial positions and restores the starting speed.
@@ -143,10 +191,8 @@ export class TileScrollingSystem extends SystemBase {
         for (let r = 0; r < this.rows.length; r++) {
             const rowZ = -(r * ROW_SPACING);
             this.rows[r].z = rowZ;
-            this.applyPattern(this.rows[r].meshes, r < SAFE_ROWS);
-            for (const mesh of this.rows[r].meshes) {
-                mesh.position.z = rowZ;
-            }
+            this.applyPattern(r, r < SAFE_ROWS);
+            this.syncRowMatrices(r, r === this.rows.length - 1);
         }
     }
 
@@ -154,11 +200,11 @@ export class TileScrollingSystem extends SystemBase {
      * Returns the world-space centre of every currently visible tile.
      * Used by PlayerObject for AABB landing checks.
      */
-    getActiveTiles(): TilePoint[] {
+    public getActiveTiles(): TilePoint[] {
         const result: TilePoint[] = [];
         for (const row of this.rows) {
-            for (let lane = 0; lane < row.meshes.length; lane++) {
-                if (row.meshes[lane].isEnabled()) {
+            for (let lane = 0; lane < LANE_X.length; lane++) {
+                if (row.enabled[lane]) {
                     result.push({
                         worldX: LANE_X[lane],
                         worldY: TILE_Y,
