@@ -15,7 +15,9 @@
         "@types/webxr": "^0.5.24",
         "fbx2gltf": "0.9.7-p1",
         "typescript": "^6.0.2",
-        "vite": "^8.0.8"
+        "vite": "^8.0.8",
+        "eslint": "^10.2.1",
+        "prettier": "^3.8.3"
     },
     "dependencies": {
         "@babylonjs/core": "^9.1.0",

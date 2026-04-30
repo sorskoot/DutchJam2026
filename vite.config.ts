@@ -1,6 +1,6 @@
-import {defineConfig, loadEnv} from 'vite';
+import {defineConfig} from 'vite';
 
-export default ({ mode }:{mode:string}) => {
+export default () => {
     return defineConfig({
         server:  {
             port: 4623,
