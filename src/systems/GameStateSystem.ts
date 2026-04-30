@@ -1,28 +1,48 @@
 import {AdvancedDynamicTexture, Control} from '@babylonjs/gui';
 import type {GameScene} from '@sorskoot/babylon-kit';
+
 import type {PlayerObject} from '../entities/PlayerObject.ts';
 import {gameSystems, SystemBase} from './SystemBase.ts';
 import type {TileScrollingSystem} from './TileScrollingSystem.ts';
 
+/** Possible states the game can be in during a session. */
 export type GameState = 'playing' | 'dead';
 
 /**
- * Tracks overall game state and shows a game-over overlay when the player falls
- * off the tiles.  MainScene stops calling gameSystems.update() when dead so all
- * other systems freeze automatically.
+ * Tracks the overall game state and shows a game-over overlay when the player
+ * falls off the tiles.
+ *
+ * {@link MainScene} stops calling `gameSystems.update()` when the state is
+ * `'dead'`, which freezes all other systems automatically.
+ *
+ * @example
+ * ```ts
+ * const stateSystem = gameSystems.get('gameState') as GameStateSystem | undefined;
+ * if (stateSystem?.state === 'dead') { return; }
+ * ```
  */
 export class GameStateSystem extends SystemBase {
+    /** Current game state; read externally by {@link MainScene} and {@link PlayerObject}. */
     public state: GameState = 'playing';
-    declare private gameScene: GameScene;
-    declare private gameOverGui: AdvancedDynamicTexture;
-    declare private gameOverRestartButton: Control;
 
+    private gameScene: GameScene;
+    private gameOverGui!: AdvancedDynamicTexture;
+    private gameOverRestartButton!: Control;
+
+    /**
+     * Creates a new {@link GameStateSystem}.
+     * @param gameScene - The {@link GameScene} that owns this system.
+     */
     constructor(gameScene: GameScene) {
         super();
         this.gameScene = gameScene;
     }
 
-    async register() {
+    /**
+     * Loads the game-over GUI from disk and wires up the restart button.
+     * @returns A promise that resolves when the GUI is ready.
+     */
+    public override async register(): Promise<void> {
         this.gameOverGui = await AdvancedDynamicTexture.ParseFromFileAsync(
             'assets/gui/guiGameOver.json'
         );
@@ -31,15 +51,23 @@ export class GameStateSystem extends SystemBase {
         this.gameOverRestartButton.onPointerClickObservable.add(this.reset);
     }
 
-    triggerGameOver(): void {
+    /**
+     * Transitions the game to the `'dead'` state and shows the game-over overlay.
+     * No-op when the state is already `'dead'`.
+     */
+    public triggerGameOver(): void {
         if (this.state === 'dead') {
             return;
         }
         this.state = 'dead';
-        this._showOverlay();
+        this.showOverlay();
     }
 
-    reset = () => {
+    /**
+     * Resets the game to `'playing'` state, hides the overlay, and restores
+     * both the tile system and the player to their starting conditions.
+     */
+    public reset = (): void => {
         this.state = 'playing';
         this.gameOverGui.rootContainer.isVisible = false;
 
@@ -50,12 +78,13 @@ export class GameStateSystem extends SystemBase {
         player?.reset();
     };
 
-    // ── Internals ────────────────────────────────────────────────────────────
+    // -={ Internals }=──────────────────────────────────────────────────────._
 
-    // GameStateSystem itself has no per-frame work – state is read externally.
-    override update(_delta: number): void {}
+    /** GameStateSystem itself has no per-frame work — state is read externally. */
+    public override update(_delta: number): void {}
 
-    private _showOverlay(): void {
+    /** Makes the game-over overlay visible. */
+    private showOverlay(): void {
         this.gameOverGui.rootContainer.isVisible = true;
     }
 }

@@ -43,7 +43,7 @@ class Systems {
      */
     public async register(name: string, system: SystemBase): Promise<void> {
         this.systems.set(name, system);
-        system.register();
+        await system.register();
     }
 
     /**

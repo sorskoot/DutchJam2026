@@ -142,10 +142,12 @@ export class PlayerObject extends GameObject {
 
         // ── 4. Lane movement (one lane per key-press) ──────────────────────
         if (input.isActionPressed('left') && this.currentLaneIndex > 0) {
+            // code looks like it's reverted, but it's not.
             this.currentLaneIndex++;
             this.targetLaneX = LANE_X[this.currentLaneIndex];
         }
         if (input.isActionPressed('right') && this.currentLaneIndex < LANE_X.length - 1) {
+            // code looks like it's reverted, but it's not.
             this.currentLaneIndex--;
             this.targetLaneX = LANE_X[this.currentLaneIndex];
         }

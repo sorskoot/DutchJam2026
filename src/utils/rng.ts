@@ -1,104 +1,121 @@
 /**
- * This code is based on an implementation of Alea algorithm; (C) 2010 Johannes Baagøe.
+ * This code is based on an implementation of the Alea algorithm; (C) 2010 Johannes Baagøe.
  * Alea is licensed according to the http://en.wikipedia.org/wiki/MIT_License.
  */
 
 const FRAC = 2.3283064365386963e-10; /* 2^-32 */
 
+/**
+ * Seeded pseudo-random number generator based on the Alea algorithm.
+ *
+ * @example
+ * ```ts
+ * import {rng} from './utils/rng.ts';
+ * const value = rng.getUniform(); // [0, 1)
+ * ```
+ */
 export class RNG {
-    _seed = 0;
-    _s0 = 0;
-    _s1 = 0;
-    _s2 = 0;
-    _c = 0;
+    private seed = 0;
+    private s0 = 0;
+    private s1 = 0;
+    private s2 = 0;
+    private c = 0;
 
-    getSeed() {
-        return this._seed;
+    /**
+     * Returns the current seed value.
+     * @returns The seed that was last passed to {@link setSeed}.
+     */
+    public getSeed(): number {
+        return this.seed;
     }
 
     /**
-     * Seed the number generator
-     * @type {number} seed - Seed value
+     * Seeds the number generator.
+     * @param seed - Seed value used to initialize the internal state.
+     * @returns This instance, to allow chaining.
      */
-    setSeed(seed: number) {
+    public setSeed(seed: number): this {
         seed = seed < 1 ? 1 / seed : seed;
 
-        this._seed = seed;
-        this._s0 = (seed >>> 0) * FRAC;
+        this.seed = seed;
+        this.s0 = (seed >>> 0) * FRAC;
 
         seed = (seed * 69069 + 1) >>> 0;
-        this._s1 = seed * FRAC;
+        this.s1 = seed * FRAC;
 
         seed = (seed * 69069 + 1) >>> 0;
-        this._s2 = seed * FRAC;
+        this.s2 = seed * FRAC;
 
-        this._c = 1;
+        this.c = 1;
         return this;
     }
 
     /**
-     * @returns Pseudorandom value [0,1), uniformly distributed
+     * @returns Pseudorandom value [0, 1), uniformly distributed.
      */
-    getUniform() {
-        let t = 2091639 * this._s0 + this._c * FRAC;
-        this._s0 = this._s1;
-        this._s1 = this._s2;
-        this._c = t | 0;
-        this._s2 = t - this._c;
-        return this._s2;
+    public getUniform(): number {
+        const t = 2091639 * this.s0 + this.c * FRAC;
+        this.s0 = this.s1;
+        this.s1 = this.s2;
+        this.c = t | 0;
+        this.s2 = t - this.c;
+        return this.s2;
     }
 
     /**
-     * @param {number} lowerBound The lower end of the range to return a value from, inclusive
-     * @param {number} upperBound The upper end of the range to return a value from, inclusive
-     * @returns Pseudorandom value [lowerBound, upperBound], using RNG.getUniform() to distribute the value
+     * @param lowerBound - The lower end of the range to return a value from, inclusive.
+     * @param upperBound - The upper end of the range to return a value from, inclusive.
+     * @returns Pseudorandom integer in [lowerBound, upperBound], uniformly distributed.
      */
-    getUniformInt(lowerBound: number, upperBound: number) {
-        let max = Math.max(lowerBound, upperBound);
-        let min = Math.min(lowerBound, upperBound);
+    public getUniformInt(lowerBound: number, upperBound: number): number {
+        const max = Math.max(lowerBound, upperBound);
+        const min = Math.min(lowerBound, upperBound);
         return Math.floor(this.getUniform() * (max - min + 1)) + min;
     }
 
     /**
-     * @param {number} lowerBound The lower end of the range to return a value from, inclusive
-     * @param {number} upperBound The upper end of the range to return a value from, inclusive
-     * @returns Pseudorandom value [lowerBound, upperBound], using RNG.getUniform() to distribute the value
+     * @param lowerBound - The lower end of the range to return a value from, inclusive.
+     * @param upperBound - The upper end of the range to return a value from, inclusive.
+     * @returns Pseudorandom float in [lowerBound, upperBound], uniformly distributed.
      */
-    getUniformFloat(lowerBound: number, upperBound: number) {
-        let max = Math.max(lowerBound, upperBound);
-        let min = Math.min(lowerBound, upperBound);
+    public getUniformFloat(lowerBound: number, upperBound: number): number {
+        const max = Math.max(lowerBound, upperBound);
+        const min = Math.min(lowerBound, upperBound);
         return this.getUniform() * (max - min) + min;
     }
 
     /**
-     * @param mean Mean value
-     * @param stddev Standard deviation. ~95% of the absolute values will be lower than 2*stddev.
-     * @returns A normally distributed pseudorandom value
+     * @param mean - Mean value.
+     * @param stddev - Standard deviation. ~95 % of values will be within 2 * stddev.
+     * @returns A normally distributed pseudorandom value.
      */
-    getNormal(mean = 0, stddev = 1) {
-        let u, v, r;
+    public getNormal(mean = 0, stddev = 1): number {
+        let u: number;
+        let v: number;
+        let r: number;
         do {
             u = 2 * this.getUniform() - 1;
             v = 2 * this.getUniform() - 1;
             r = u * u + v * v;
-        } while (r > 1 || r == 0);
+        } while (r > 1 || r === 0);
 
-        let gauss = u * Math.sqrt((-2 * Math.log(r)) / r);
+        const gauss = u * Math.sqrt((-2 * Math.log(r)) / r);
         return mean + gauss * stddev;
     }
 
     /**
-     * @returns Pseudorandom value [1,100] inclusive, uniformly distributed
+     * @returns Pseudorandom value [1, 100] inclusive, uniformly distributed.
      */
-    getPercentage() {
+    public getPercentage(): number {
         return 1 + Math.floor(this.getUniform() * 100);
     }
 
     /**
-     * @param {Array} array Array to pick a random item from
-     * @returns Randomly picked item, null when length=0
+     * Picks a random item from an array.
+     * @param array - Array to pick a random item from.
+     * @returns A randomly selected item, or `null` when the array is empty.
      */
-    getItem(array: Array<any>) {
+    public getItem<T>(array: T[]): T | null {
         if (!array.length) {
             return null;
         }
@@ -106,76 +123,104 @@ export class RNG {
     }
 
     /**
-     * Gets random unique items from an array
-     * @param array the array to get items from
-     * @param amount the amount of items to get
-     * @returns the random item; null if the array is empty
+     * Gets a collection of random unique items from an array.
+     * @param array - The array to draw items from.
+     * @param amount - The number of unique items to return.
+     * @returns An array of randomly selected unique items; empty when the source is empty.
      */
-    getItems<T>(array: T[], amount: number): T[] {
+    public getItems<T>(array: T[], amount: number): T[] {
         if (!array.length) {
             return [];
         }
 
-        if (amount > array.length) {
-            amount = array.length;
-        }
-
+        const clamped = Math.min(amount, array.length);
         const result = new Set<T>();
-        while (result.size < amount) {
+        while (result.size < clamped) {
             result.add(array[Math.floor(this.getUniform() * array.length)]);
         }
         return Array.from(result);
     }
 
     /**
-     * @param {Array} array Array to randomize
-     * @returns New array with randomized items
+     * Returns a new array containing the same items in a random order.
+     * @param array - Array to randomize.
+     * @returns New array with randomized item order.
      */
-    shuffle(array: Array<any>) {
-        let result = [];
-        let clone = array.slice();
+    public shuffle<T>(array: T[]): T[] {
+        const result: T[] = [];
+        const clone = array.slice();
         while (clone.length) {
-            let index = clone.indexOf(this.getItem(clone));
+            const item = this.getItem(clone) as T;
+            const index = clone.indexOf(item);
             result.push(clone.splice(index, 1)[0]);
         }
         return result;
     }
 
     /**
-     * @param {Object} data key = whatever, value=weight (relative probability)
-     * @returns whatever
+     * Picks a key from a weighted map where values represent relative probabilities.
+     * @param data - An object whose keys are candidates and values are their weights.
+     * @returns The randomly selected key.
      */
-    getWeightedValue(data: any) {
+    public getWeightedValue(data: Record<string, number>): string | undefined {
         let total = 0;
 
-        for (let id in data) {
+        for (const id in data) {
             total += data[id];
         }
-        let random = this.getUniform() * total;
 
-        let id,
-            part = 0;
-        for (id in data) {
+        const random = this.getUniform() * total;
+
+        let part = 0;
+        for (const id in data) {
             part += data[id];
             if (random < part) {
                 return id;
             }
         }
 
-        // If by some floating-point annoyance we have
-        // random >= total, just return the last id.
-        return id;
+        // If by some floating-point annoyance random >= total, return the last key.
+        return Object.keys(data).pop();
     }
 
     /**
-     * Get RNG state. Useful for storing the state and re-setting it via setState.
-     * @returns Internal state
+     * Returns the current internal state. Useful for storing and restoring via {@link setState}.
+     * @returns A snapshot of the four internal state values.
      */
-    getState() {
-        return [this._s0, this._s1, this._s2, this._c];
+    public getState(): [number, number, number, number] {
+        return [this.s0, this.s1, this.s2, this.c];
     }
 
-    randomNonRepeatingValues(min: number, max: number, valueCount: number): number[] {
+    /**
+     * Restores a previously captured state.
+     * @param state - A state snapshot previously returned by {@link getState}.
+     * @returns This instance, to allow chaining.
+     */
+    public setState(state: [number, number, number, number]): this {
+        this.s0 = state[0];
+        this.s1 = state[1];
+        this.s2 = state[2];
+        this.c = state[3];
+        return this;
+    }
+
+    /**
+     * Returns a cloned {@link RNG} with an identical internal state.
+     * @returns A new independent {@link RNG} instance seeded to the same state.
+     */
+    public clone(): RNG {
+        const clone = new RNG();
+        return clone.setState(this.getState());
+    }
+
+    /**
+     * Returns an array of non-repeating random integers in [min, max).
+     * @param min - Inclusive lower bound.
+     * @param max - Exclusive upper bound.
+     * @param valueCount - How many unique values to return.
+     * @returns An array of `valueCount` unique integers drawn from [min, max).
+     */
+    public randomNonRepeatingValues(min: number, max: number, valueCount: number): number[] {
         const count = max - min;
         const values = new Array<number>(count);
         for (let x = 0; x < count; x++) {
@@ -184,42 +229,26 @@ export class RNG {
 
         this.shuffleArray(values);
 
-        let results = [];
-
+        const results: number[] = [];
         for (let x = 0; x < valueCount && x < values.length; x++) {
             results.push(values[x]);
         }
         return results;
     }
 
-    shuffleArray<T>(array: T[]) {
-        // shuffle array
+    /**
+     * Shuffles an array in place using a Fisher-Yates algorithm driven by this RNG.
+     * @param array - The array to shuffle in place.
+     */
+    public shuffleArray<T>(array: T[]): void {
         for (let x = array.length - 1; x >= 0; x--) {
-            let index = this.getUniformInt(0, x); // Second argument is inclusive
+            const index = this.getUniformInt(0, x);
             const temp: T = array[x];
             array[x] = array[index];
             array[index] = temp;
         }
     }
-
-    /**
-     * Set a previously retrieved state.
-     */
-    setState(state: number[]) {
-        this._s0 = state[0];
-        this._s1 = state[1];
-        this._s2 = state[2];
-        this._c = state[3];
-        return this;
-    }
-
-    /**
-     * Returns a cloned RNG
-     */
-    clone() {
-        let clone = new RNG();
-        return clone.setState(this.getState());
-    }
 }
 
+/** Singleton {@link RNG} instance, seeded with the current timestamp at startup. */
 export const rng = new RNG().setSeed(Date.now());
