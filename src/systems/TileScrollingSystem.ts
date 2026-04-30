@@ -2,30 +2,30 @@ import {Color3, Mesh, MeshBuilder, Scene, StandardMaterial, Vector3} from '@baby
 import {rng} from '../utils/rng.ts';
 import {SystemBase} from './SystemBase.ts';
 
-/** X centre of each of the 5 lanes. */
+/** X center of each of the 5 lanes. */
 const LANE_X: readonly number[] = [-8, -4, 0, 4, 8];
 
 const TILE_WIDTH = 4;
 const TILE_HEIGHT = 0.5;
-const TILE_DEPTH = 6 ;
-const TILE_Y = 0; // tile mesh centre Y (top = +0.25)
+const TILE_DEPTH = 6;
+const TILE_Y = 0; // tile mesh center Y (top = +0.25)
 
 const NUM_ROWS = 20;
-const ROW_SPACING = 6;          // tile depth (4) + 2-unit gap
-const INITIAL_SPEED = 12;       // world units / second
-const RECYCLE_THRESHOLD = 8;    // recycle a row when its Z exceeds this
-const SAFE_ROWS = 3;            // first N rows start fully filled
+const ROW_SPACING = 6; // tile depth (4) + 2-unit gap
+const INITIAL_SPEED = 12; // world units / second
+const RECYCLE_THRESHOLD = 8; // recycle a row when its Z exceeds this
+const SAFE_ROWS = 3; // first N rows start fully filled
 
 /** Data exposed to PlayerObject for AABB collision. */
 export interface TilePoint {
     worldX: number;
-    worldY: number;    // tile centre Y (always TILE_Y)
+    worldY: number; // tile centre Y (always TILE_Y)
     worldZ: number;
 }
 
 interface TileRow {
-    meshes: Mesh[];    // one mesh per lane, index 0-4; may be disabled
-    z: number;         // current world Z of this row's centre
+    meshes: Mesh[]; // one mesh per lane, index 0-4; may be disabled
+    z: number; // current world Z of this row's centre
 }
 
 /**
@@ -52,11 +52,15 @@ export class TileScrollingSystem extends SystemBase {
             const meshes: Mesh[] = [];
 
             for (let lane = 0; lane < LANE_X.length; lane++) {
-                const mesh = MeshBuilder.CreateBox(`tile_r${r}_l${lane}`, {
-                    width: TILE_WIDTH,
-                    height: TILE_HEIGHT,
-                    depth: TILE_DEPTH,
-                }, scene);
+                const mesh = MeshBuilder.CreateBox(
+                    `tile_r${r}_l${lane}`,
+                    {
+                        width: TILE_WIDTH,
+                        height: TILE_HEIGHT,
+                        depth: TILE_DEPTH,
+                    },
+                    scene
+                );
                 mesh.material = mat;
                 mesh.position = new Vector3(LANE_X[lane], TILE_Y, rowZ);
                 meshes.push(mesh);
@@ -130,6 +134,23 @@ export class TileScrollingSystem extends SystemBase {
     // ── Public API ───────────────────────────────────────────────────────────
 
     /**
+     * Resets all rows to their initial positions and restores the starting speed.
+     * Call this when restarting the game without reloading the page.
+     */
+    public reset(): void {
+        this.speed = INITIAL_SPEED;
+
+        for (let r = 0; r < this.rows.length; r++) {
+            const rowZ = -(r * ROW_SPACING);
+            this.rows[r].z = rowZ;
+            this.applyPattern(this.rows[r].meshes, r < SAFE_ROWS);
+            for (const mesh of this.rows[r].meshes) {
+                mesh.position.z = rowZ;
+            }
+        }
+    }
+
+    /**
      * Returns the world-space centre of every currently visible tile.
      * Used by PlayerObject for AABB landing checks.
      */
@@ -149,4 +170,3 @@ export class TileScrollingSystem extends SystemBase {
         return result;
     }
 }
-

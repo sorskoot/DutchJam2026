@@ -56,9 +56,11 @@ export class MainScene extends GameScene {
 
         // -={ Systems }=─────────────────────────────────────────────────────────._
         // Register before addGameObject so the player can access them on start.
-        gameSystems.register('gameState', new GameStateSystem());
-        gameSystems.register('score', new ScoreSystem());
-        gameSystems.register('tiles', new TileScrollingSystem(this.scene));
+        const gameStateSystem = new GameStateSystem(this);
+
+        await gameSystems.register('gameState', gameStateSystem);
+        await gameSystems.register('score', new ScoreSystem());
+        await gameSystems.register('tiles', new TileScrollingSystem(this.scene));
 
         // -={ Player }=──────────────────────────────────────────────────────────._
         this.addGameObject('Player', new PlayerObject(this, this.game));

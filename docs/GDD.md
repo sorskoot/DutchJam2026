@@ -2,96 +2,87 @@
 
 ## SpeedRoads: Highway Panic
 
-*A fast-paced 3D survival driving game where slowing down means exploding.*
+*A fast-paced 3D tile-hopping survival game inspired by the classic SkyRoads.*
 
 1. High-Concept Summary
-   You drive a city bus rigged with a bomb. If your speed drops below 50 mph, a countdown starts. Stay above 50 by
-   weaving through traffic, avoiding lane closures, hitting ramps, and navigating a chaotic 5-lane highway.
+   The world scrolls forward automatically and the player must jump from tile to tile on a 5-lane highway in the sky.
+   Miss a tile, fall off the edge, or get left behind and it is game over. The further you go, the faster and more
+   unpredictable the road becomes.
 
    **Theme**
-   Don’t stop moving.
+   Keep moving or fall.
 
    **Tone**
-   High-pressure, cinematic, slightly humorous.
+   Arcade, high-energy, addictive.
 
    **Camera**
-   Third-person chase cam. First version is locked behind the bus, if time allows it we can make the camera more
-   dynamic (e.g. slight tilt when turning, zoom out at high speed) and elastic.
+   Third-person chase cam locked slightly above and behind the player. The camera follows the player's lane position
+   smoothly. If time allows, add a slight tilt when changing lanes and a slow zoom-out as speed increases.
 
 2. Core Gameplay Loop
-    1. Maintain speed above 50 mph
-    2. Navigate traffic and obstacles
-    3. Use ramps/boosts to recover speed
-    4. Survive as long as possible
-    5. Score increases with distance traveled
+    1. The road scrolls forward automatically at increasing speed.
+    2. The player jumps between tiles to avoid gaps and stay on the road.
+    3. The further the player travels the higher the score.
+    4. Survive as long as possible.
 
-       **Fail state**: Speed < 50 mph for 2 seconds → explosion → game over.
+       **Fail state**: Player falls off the road (misses a tile or gets left behind) → game over.
 
 ________________________________________
 
 ## Core Mechanics
 
-**Speed Bomb System**
+**Automatic Scrolling**
 
-- Speedometer constantly visible
-- Threshold: 50 mph
-- If speed < 50 → warning siren, screen flashes red, 2-second countdown
-- If speed recovers → countdown resets
-- If countdown hits zero → explosion
+- The road always moves toward the player at a fixed forward speed.
+- The player cannot stop or slow down the scroll.
+- Scroll speed increases gradually over time, raising the difficulty.
 
-**Bus Handling**
+**Player Movement**
 
-- Heavy, slow steering
-- Gradual lane changes (no instant strafing)
-- Acceleration is limited
-- Braking is disabled (bomb logic)
+- Left / right: instant lane change between the 5 lanes (lerped visually for smoothness).
+- Jump: the player can jump to cross gaps or avoid hazards.
+- No braking, no acceleration — the only inputs are lane change and jump.
 
-**Obstacles**
+**Tiles**
 
-- Slow cars in lanes
-- Trucks blocking lanes
-- Lane closures with cones/barriers
-- Construction pits (gaps)
-- Road splits (choose left or right)
-- Debris that slows you down
-- Oil slicks (reduced steering)
+- The playfield is a grid of 5 lanes × N visible rows of tiles.
+- Each tile is either present (solid, safe to land on) or absent (a gap).
+- The first few rows are always fully present to give the player a safe start.
+- Further rows are procedurally generated with increasing gap probability.
+- Every row is guaranteed to have at least 2 tiles so the level is always survivable.
 
-**Movement Aids**
+**Gaps and Falling**
 
-- Boost pads
-- Downhill slopes
-- Ramps over broken sections
-- Drafting behind cars (optional)
+- If the player lands on a missing tile they fall immediately.
+- If the player is still in the air when the row they are above scrolls past the kill plane, they also die.
+- Fall death threshold: `Y < -5` units.
 
 ________________________________________
 
 ## Level Design
 
-**Highway Structure**
+**Road Structure**
 
-- 5 lanes
-- Repeating modular segments (50-100m each)
-  - Maybe start random. Later we can add some scripted segments for variety.
-- Each segment contains 0-3 obstacles
-- Occasional splits into 3-4 lanes
-- Rare “bridge collapse” gaps requiring a ramp
-- Progressively more difficult segments as you go further
+- 5 lanes, fixed width.
+- Endless, procedurally generated rows of tiles recycled from a pool.
+- Rows scroll toward the player at the current game speed.
 
-**Segment Types**
+**Tile Generation Rules**
 
-- Traffic segment: cars in lanes
-- Construction segment: closures, cones
-- Gap segment: ramps + missing road
-- Boost segment: speed pads
-- Chaos segment: mixed hazards
+- Rows 0–2 (start / safe zone): all 5 tiles present.
+- Rows 3+: each tile has a probability of being present. The probability of a gap increases as distance grows.
+- Minimum tiles per row: 2 (to always leave a valid path).
+- Special tile types (optional, later phases):
+  - **Boost tile**: speeds the scroll up briefly, worth bonus points.
+  - **Slow tile**: briefly reduces scroll speed (helpful breathing room).
+  - **Crumble tile**: disappears a short time after the player lands on it.
 
 **Difficulty Curve**
 
-- Starts with light traffic
-- Gradually increases density
-- More closures and gaps appear
-- Speed threshold may increase slightly (optional)
-- Bus inside tunnel, camera outside above so bus is not visible for a moment. 
+- Scroll speed starts slow and ramps up continuously.
+- Gap probability increases with distance traveled.
+- At high speeds, gap probability plateaus to keep the game technically survivable.
+- Possible milestone events at score thresholds (visual change, speed spike, etc.).
 
 ________________________________________
 
@@ -99,43 +90,41 @@ ________________________________________
 
 ### Style
 
-- Simple, readable 3D
-- Low-poly or mid-poly
-- Bright colors for obstacles
-- Realistic but stylized highway environment
-- Emphasis on clarity over detail
+- Simple, readable 3D.
+- Low-poly or mid-poly tiles floating in a stylized sky environment.
+- Bright, distinct tile colors for fast readability.
+- Emphasis on clarity: the player must instantly see which tiles are present.
 
 ### Key Visual Elements
 
-- Yellow/blue bus
-- Orange cones
-- Red/white barriers
-- Asphalt with lane markings
-- Simple car models
-- Boost pads glowing blue
-- Ramps made from construction planks or tilted trucks
+- Solid tiles: bright colored flat boxes (palette shifts with difficulty zone).
+- Missing tiles: empty void — no mesh, just the skybox below.
+- Player: a small, bright character (currently a yellow sphere placeholder).
+- Background: scrolling sky gradient, distant clouds or stars depending on theme.
+- Crumble tiles (future): slightly cracked texture with a subtle shake animation.
+- Boost tiles (future): glowing blue surface with a particle trail.
 
 ________________________________________
 
 ## Audio Direction
 
-- Engine hum that changes with speed
-- Warning siren when under 50
-- Honking cars
-- Construction zone ambience
-- Explosion SFX on fail
-- Upbeat, tense music track
+- Upbeat, looping electronic / chiptune soundtrack.
+- Jump sound effect.
+- Land sound effect (varies slightly per tile type).
+- Fall / death sound effect.
+- Speed-up musical cue when the scroll accelerates.
+- Short jingle on game over.
 
 ________________________________________
 
 ## Game Feel / Juice
 
-- Camera shake on collisions
-- Sparks when scraping cars
-- Motion blur at high speed
-- Screen vignette when under 50
-- Speed lines when boosting
-- Explosion with fireball + debris
+- Camera bobs slightly on landing.
+- Subtle screen shake when falling to death.
+- Particle burst on landing.
+- Speed lines overlay when scroll speed is very high.
+- Tile color palette crossfades between difficulty zones.
+- Score counter pulses on each row cleared.
 
 ________________________________________
 
@@ -143,65 +132,64 @@ ________________________________________
 
 **Scene Setup**
 
-- Ground: long highway mesh or repeated segments
-- Lanes: 5, each 3-4 meters wide
-- Player bus: physics impostor or simple kinematic movement
-- Traffic cars: simple AI moving forward at slower speeds
-- Obstacles: static meshes with collision boxes
+- Player: simple kinematic sphere/box with fake gravity applied each frame.
+- Tile pool: 20 rows × 5 lanes of `Box` meshes, recycled when a row passes the recycle threshold behind the camera.
+- Skybox or gradient background.
 
 **Systems**
 
-- Speed system
-- Countdown system
-- Segment spawner
-- Traffic spawner
-- Collision slowdown
-- Boost pad logic
-- Ramp physics (simple upward impulse)
+| System | Description |
+|--------|-------------|
+| `TileScrollingSystem` | Manages the tile pool, procedural row generation, and scroll speed. |
+| `ScoreSystem` | Tracks distance traveled and displays the score. |
+| `SpeedSystem` | Controls scroll speed ramp-up over time. |
+| `GameStateSystem` | Tracks `playing` / `dead` state, shows game-over overlay, handles restart. |
+
+**Tile Recycling**
+
+- Rows that scroll past `RECYCLE_THRESHOLD` behind the player are repositioned at the far end of the pool with freshly
+  generated tile patterns.
+- Tile presence uses the `rng` seeded PRNG singleton for reproducible generation during a session.
 
 **Performance**
 
-- Recycle segments behind the player
-- Recycle traffic cars
-- Keep draw calls low (instancing)
+- All tile meshes are created once and reused (no runtime allocations during play).
+- Keep draw calls low via instancing where possible.
 
 ________________________________________
 
 ## Production Plan
 
-### Phase 1
+### Phase 1 — Prototype (current)
 
-Create the very basic version of the game. Player is a yellow box. Highway is simple. Movement is forward + left/right
-or break.
+Basic scrolling tile grid, player sphere that can change lanes and jump, fall detection, game-over screen.
 
 ### TODO
 
--[x] Set up project
+- [x] Set up project
     - [x] Create Main scene
     - [x] Set up basic camera
-    - [x] Create player bus placeholder
-    - [x] Add controls.
+    - [x] Create player placeholder
+    - [x] Add controls
     - [x] Create first basic game loop
--[x] Add to GitHub 
--[ ] Set up highway
--[x] Add bus model or placeholder box
--[ ] Implement forward movement + steering
--[ ] Add speedometer UI
--[ ] Implement speed bomb logic
--[ ] Add warning UI + countdown
--[ ] Add explosion fail state
--[ ] Add traffic cars
--[ ] Add lane closures
--[ ] Add simple collision slowdown
--[ ] Add ramps + gaps
--[ ] Add boost pads
--[ ] Add segment spawning
--[ ] Add juice: camera shake, sparks, warning flash
--[ ] Add basic sound effects
--[ ] Polish
--[ ] Balance difficulty
--[ ] Add title screen + restart button
--[ ] Set up Itch.io page
+- [x] Add to GitHub
+- [x] Add tile scrolling system (pool of 20 rows × 5 lanes)
+- [x] Add lane-change + jump input
+- [x] Add fake gravity + fall detection
+- [x] Add game-over state
+- [ ] Add score system (distance traveled)
+- [ ] Add speed ramp-up over time
+- [ ] Add procedural gap generation (increasing difficulty)
+- [ ] Add special tile types (boost, crumble)
+- [ ] Add Babylon GUI to replace DOM game-over overlay
+- [ ] Add jump + land particle effects
+- [ ] Add camera bob on landing
+- [ ] Add speed-lines overlay at high speed
+- [ ] Add basic sound effects
+- [ ] Add title screen + restart button
+- [ ] Polish visual palette / skybox
+- [ ] Balance difficulty curve
+- [ ] Set up Itch.io page
 
 ________________________________________
 
@@ -209,8 +197,8 @@ ________________________________________
 
 ### Win
 
-Technically you can't win. Survive as long as possible (distance score).
+Technically you cannot win. Survive as long as possible and maximize your distance score.
 
 ### Lose
 
-Speed < 50 mph for 2 seconds → explosion.
+The player falls off the road (lands on a gap or gets left behind by the scroll) → game over.

@@ -17,6 +17,12 @@ The package is published as an ES module (`"type": "module"`) and is consumed by
 alongside `@babylonjs/core`, `@babylonjs/gui`, and `@babylonjs/loaders`.
 
 ---
+## General Guidelines
+
+- We use US English spelling and grammar in all code and documentation.
+- Do not include emojis in code or documentation unless explicitly asked.
+
+---
 
 ## Documentation Requirements
 

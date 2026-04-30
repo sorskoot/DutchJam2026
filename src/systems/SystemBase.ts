@@ -14,6 +14,11 @@
  */
 export abstract class SystemBase {
     /**
+     * Called once when the system is registered.
+     */
+    public async register(): Promise<void> {}
+
+    /**
      * Called once per frame while the game is running.
      * @param _delta - Elapsed time in seconds since the last frame.
      */
@@ -36,8 +41,9 @@ class Systems {
      * @param name - Unique identifier for the system.
      * @param system - The {@link SystemBase} instance to register.
      */
-    public register(name: string, system: SystemBase): void {
+    public async register(name: string, system: SystemBase): Promise<void> {
         this.systems.set(name, system);
+        system.register();
     }
 
     /**

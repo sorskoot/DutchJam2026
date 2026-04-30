@@ -71,6 +71,19 @@ export class PlayerObject extends GameObject {
     }
 
     /**
+     * Resets all physics and lane state back to the initial values.
+     * Call this when restarting the game without reloading the page.
+     */
+    public reset(): void {
+        this.currentLaneIndex = START_LANE;
+        this.targetLaneX = LANE_X[START_LANE];
+        this.lerpX = LANE_X[START_LANE];
+        this.verticalVelocity = 0;
+        this.isGrounded = false;
+        this.position = new Vector3(LANE_X[START_LANE], START_Y, 0);
+    }
+
+    /**
      * Per-frame update: gravity, jumping, AABB landing, lane movement, and
      * fall / game-over detection.
      *
@@ -120,11 +133,11 @@ export class PlayerObject extends GameObject {
 
         // ── 4. Lane movement (one lane per key-press) ──────────────────────
         if (input.isActionPressed('left') && this.currentLaneIndex > 0) {
-            this.currentLaneIndex--;
+            this.currentLaneIndex++;
             this.targetLaneX = LANE_X[this.currentLaneIndex];
         }
         if (input.isActionPressed('right') && this.currentLaneIndex < LANE_X.length - 1) {
-            this.currentLaneIndex++;
+            this.currentLaneIndex--;
             this.targetLaneX = LANE_X[this.currentLaneIndex];
         }
 
