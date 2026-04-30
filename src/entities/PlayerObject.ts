@@ -16,7 +16,7 @@ const JUMP_IMPULSE = 10; // upward velocity applied on jump
 const KILL_Y = -5; // fall below this → game over
 const LANE_LERP_SPEED = 10; // fraction-of-gap applied per second (1/0.1 s)
 const TILE_HALF_W = 2; // tile width 4  → half = 2
-const TILE_HALF_D = 2; // tile depth 4  → half = 2
+const TILE_HALF_D = 3; // tile depth 6  → half = 3
 const LAND_TOLERANCE = 0.8; // how far below tile top we still snap up
 
 /**
@@ -98,18 +98,27 @@ export class PlayerObject extends GameObject {
 
         const input = this.scene.getInputManager();
 
-        // ── 1. Jump (uses isGrounded from previous frame) ──────────────────
-        if (this.isGrounded && input.isActionPressed('jump')) {
+        // Snapshot grounded state from last frame then clear it; will be
+        // re-set below if the AABB check finds a tile this frame.
+        const wasGrounded = this.isGrounded;
+        this.isGrounded = false;
+
+        // ── 1. Jump / gravity ──────────────────────────────────────────────
+        if (wasGrounded && input.isActionPressed('jump')) {
+            // Launch upward; gravity starts accumulating next frame.
             this.verticalVelocity = JUMP_IMPULSE;
-            this.isGrounded = false;
+        } else if (!wasGrounded) {
+            // Accumulate gravity only while airborne — skipping it when
+            // grounded prevents the per-frame dip-then-snap artefact.
+            this.verticalVelocity += this.fakeGravity * deltaTime;
+        } else {
+            this.verticalVelocity = 0;
         }
 
         // ── 2. Fake gravity + vertical movement ────────────────────────────
-        this.verticalVelocity += this.fakeGravity * deltaTime;
         this.position.y += this.verticalVelocity * deltaTime;
 
         // ── 3. AABB tile landing (only when moving down or stationary) ─────
-        this.isGrounded = false;
         const tileSystem = gameSystems.get('tiles') as TileScrollingSystem | undefined;
         if (tileSystem && this.verticalVelocity <= 0) {
             for (const tile of tileSystem.getActiveTiles()) {

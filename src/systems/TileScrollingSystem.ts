@@ -18,28 +18,37 @@ const SAFE_ROWS = 3; // first N rows start fully filled
 
 /** Data exposed to PlayerObject for AABB collision. */
 export interface TilePoint {
+    /** World-space X center of the tile. */
     worldX: number;
-    worldY: number; // tile centre Y (always TILE_Y)
+    /** World-space Y center of the tile (always {@link TILE_Y}). */
+    worldY: number;
+    /** World-space Z center of the tile. */
     worldZ: number;
 }
 
+/**
+ * Internal row state tracking enabled lanes and current world Z.
+ * @internal
+ */
 interface TileRow {
     /** Whether each lane slot is active; index 0-4 maps to LANE_X. */
     enabled: boolean[];
-    /** Current world Z of this row's centre. */
+    /** Current world Z of this row's center. */
     z: number;
 }
 
 /**
  * Creates and scrolls a pool of flat box tiles arranged in 5 lanes.
- * All tiles share a single GPU-instanced mesh (thin instances) to minimise draw calls.
+ * All tiles share a single GPU-instanced mesh (thin instances) to minimize draw calls.
  * Gaps are generated randomly each time a row is recycled.
  */
 export class TileScrollingSystem extends SystemBase {
     /** Scroll speed in world units/s — increase over time for difficulty ramp. */
     public speed: number = INITIAL_SPEED;
 
+    /** Pool of row state objects, one per logical tile row. */
     private readonly rows: TileRow[] = [];
+    /** The single shared box mesh rendered via thin instances. */
     private readonly tileMesh: Mesh;
 
     // -={ Thin-instance helpers }=──────────────────────────────────────────._
@@ -48,6 +57,11 @@ export class TileScrollingSystem extends SystemBase {
     /** Scratch matrix used in hot paths to avoid per-frame allocations. */
     private readonly tmpMatrix: Matrix = Matrix.Identity();
 
+    /**
+     * Creates the tile mesh, material, row pool, and registers all thin instances.
+     *
+     * @param scene - The Babylon.js scene to create tile geometry in.
+     */
     constructor(scene: Scene) {
         super();
 
@@ -67,7 +81,7 @@ export class TileScrollingSystem extends SystemBase {
         this.tileMesh.material = mat;
         this.tileMesh.isPickable = false;
 
-        // -={ Row initialisation }=─────────────────────────────────────────._
+        // -={ Row initialization }=─────────────────────────────────────────._
         for (let r = 0; r < NUM_ROWS; r++) {
             const rowZ = -(r * ROW_SPACING);
             const enabled = new Array<boolean>(LANE_X.length).fill(true);
@@ -93,7 +107,13 @@ export class TileScrollingSystem extends SystemBase {
 
     // -={ Helpers }=────────────────────────────────────────────────────────._
 
-    /** Returns the flat thin-instance index for a given row/lane pair. */
+    /**
+     * Returns the flat thin-instance index for a given row/lane pair.
+     *
+     * @param row - Zero-based row index into {@link rows}.
+     * @param lane - Zero-based lane index (0–4).
+     * @returns The flat buffer index used by {@link Mesh.thinInstanceSetMatrixAt}.
+     */
     private instanceIndex(row: number, lane: number): number {
         return row * LANE_X.length + lane;
     }
@@ -102,6 +122,9 @@ export class TileScrollingSystem extends SystemBase {
      * Writes the enabled flags for one row.
      * Does NOT push matrices to the GPU — callers must do that via
      * {@link syncRowMatrices} or the bulk update in {@link update}.
+     *
+     * @param rowIndex - Zero-based index into {@link rows}.
+     * @param forceAll - When true every lane is enabled regardless of RNG.
      */
     private applyPattern(rowIndex: number, forceAll: boolean): void {
         const row = this.rows[rowIndex];
@@ -156,16 +179,32 @@ export class TileScrollingSystem extends SystemBase {
 
     // -={ SystemBase }=─────────────────────────────────────────────────────._
 
+    /**
+     * Advances all tile rows by {@link speed} * deltaTime, recycling any row
+     * that scrolls past {@link RECYCLE_THRESHOLD} and assigning a new gap pattern.
+     *
+     * Two-pass approach: all rows are moved first so that {@link minZ} reflects
+     * the true post-movement back position before any recycled row is placed.
+     * Computing minZ from pre-movement positions would place recycled rows one
+     * `speed * deltaTime` step too far back, creating a growing visual gap.
+     *
+     * @param deltaTime - Elapsed time in seconds since the last frame.
+     */
     override update(deltaTime: number): void {
-        // Current minimum Z used to place recycled rows at the far end
+        // -={ Pass 1: advance all rows }=───────────────────────────────────._
+        for (const row of this.rows) {
+            row.z += this.speed * deltaTime;
+        }
+
+        // Find the true minimum Z only after all rows have moved.
         let minZ = Number.POSITIVE_INFINITY;
         for (const row of this.rows) {
             if (row.z < minZ) { minZ = row.z; }
         }
 
+        // -={ Pass 2: recycle and sync matrices }=──────────────────────────._
         for (let r = 0; r < this.rows.length; r++) {
             const row = this.rows[r];
-            row.z += this.speed * deltaTime;
 
             if (row.z > RECYCLE_THRESHOLD) {
                 // Push row to the back and generate a new gap pattern
@@ -189,16 +228,17 @@ export class TileScrollingSystem extends SystemBase {
         this.speed = INITIAL_SPEED;
 
         for (let r = 0; r < this.rows.length; r++) {
-            const rowZ = -(r * ROW_SPACING);
-            this.rows[r].z = rowZ;
+            this.rows[r].z = -(r * ROW_SPACING);
             this.applyPattern(r, r < SAFE_ROWS);
             this.syncRowMatrices(r, r === this.rows.length - 1);
         }
     }
 
     /**
-     * Returns the world-space centre of every currently visible tile.
-     * Used by PlayerObject for AABB landing checks.
+     * Returns the world-space center of every currently visible tile.
+     * Used by {@link PlayerObject} for AABB landing checks.
+     *
+     * @returns Array of {@link TilePoint} objects, one per enabled tile slot.
      */
     public getActiveTiles(): TilePoint[] {
         const result: TilePoint[] = [];
