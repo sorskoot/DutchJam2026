@@ -48,11 +48,10 @@ export class MainScene extends GameScene {
             createGround: false,
             createSkybox: false,
         });
-
         // -={ Lighting }=────────────────────────────────────────────────────────._
         const light = new HemisphericLight('mainLight', new Vector3(0, 1, 0), this.scene);
         light.groundColor = new Color3(0.3, 0.3, 0.3);
-        light.intensity = 1.2;
+        light.intensity = 1;
 
         // -={ Systems }=─────────────────────────────────────────────────────────._
         // Register before addGameObject so the player can access them on start.

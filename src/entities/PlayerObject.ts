@@ -11,9 +11,9 @@ const PLAYER_RADIUS = 0.5;
 const START_LANE = 2; // center lane
 const TILE_HALF_HEIGHT = 0.25; // tile height 0.5 → top at +0.25 from center
 const START_Y = TILE_HALF_HEIGHT + PLAYER_RADIUS; // 0.75 – resting on initial tile
-const FAKE_GRAVITY = -20; // world units / s²  (easy to tweak later)
-const JUMP_IMPULSE = 10; // upward velocity applied on jump
-const KILL_Y = -5; // fall below this → game over
+const FAKE_GRAVITY = -60; // world units / s²  (easy to tweak later)
+const JUMP_IMPULSE = 15; // upward velocity applied on jump
+const KILL_Y = -2; // fall below this → game over
 const LANE_LERP_SPEED = 10; // fraction-of-gap applied per second (1/0.1 s)
 const TILE_HALF_W = 2; // tile width 4  → half = 2
 const TILE_HALF_D = 3; // tile depth 6  → half = 3
@@ -141,12 +141,12 @@ export class PlayerObject extends GameObject {
         }
 
         // ── 4. Lane movement (one lane per key-press) ──────────────────────
-        if (input.isActionPressed('left') && this.currentLaneIndex > 0) {
+        if (input.isActionPressed('left') && this.currentLaneIndex < LANE_X.length - 1) {
             // code looks like it's reverted, but it's not.
             this.currentLaneIndex++;
             this.targetLaneX = LANE_X[this.currentLaneIndex];
         }
-        if (input.isActionPressed('right') && this.currentLaneIndex < LANE_X.length - 1) {
+        if (input.isActionPressed('right') && this.currentLaneIndex > 0) {
             // code looks like it's reverted, but it's not.
             this.currentLaneIndex--;
             this.targetLaneX = LANE_X[this.currentLaneIndex];

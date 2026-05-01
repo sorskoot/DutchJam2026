@@ -10,11 +10,12 @@ const TILE_HEIGHT = 0.5;
 const TILE_DEPTH = 6;
 const TILE_Y = 0; // tile mesh center Y (top = +0.25)
 
-const NUM_ROWS = 20;
+const NUM_ROWS = 32;
 const ROW_SPACING = 6; // tile depth (4) + 2-unit gap
 const INITIAL_SPEED = 12; // world units / second
+const INITIAL_TILE_CHANCE = 0.65; // initial chance for a tile to appear in a lane
 const RECYCLE_THRESHOLD = 8; // recycle a row when its Z exceeds this
-const SAFE_ROWS = 3; // first N rows start fully filled
+const SAFE_ROWS = 6; // first N rows start fully filled
 
 /** Data exposed to PlayerObject for AABB collision. */
 export interface TilePoint {
@@ -45,6 +46,7 @@ interface TileRow {
 export class TileScrollingSystem extends SystemBase {
     /** Scroll speed in world units/s — increase over time for difficulty ramp. */
     public speed: number = INITIAL_SPEED;
+    private tileChance = INITIAL_TILE_CHANCE;
 
     /** Pool of row state objects, one per logical tile row. */
     private readonly rows: TileRow[] = [];
@@ -80,7 +82,6 @@ export class TileScrollingSystem extends SystemBase {
         );
         this.tileMesh.material = mat;
         this.tileMesh.isPickable = false;
-
         // -={ Row initialization }=─────────────────────────────────────────._
         for (let r = 0; r < NUM_ROWS; r++) {
             const rowZ = -(r * ROW_SPACING);
@@ -99,7 +100,10 @@ export class TileScrollingSystem extends SystemBase {
                     Matrix.TranslationToRef(LANE_X[lane], TILE_Y, row.z, this.tmpMatrix);
                     this.tileMesh.thinInstanceAdd(this.tmpMatrix, isLastInstance);
                 } else {
-                    this.tileMesh.thinInstanceAdd(TileScrollingSystem.HIDDEN_MATRIX, isLastInstance);
+                    this.tileMesh.thinInstanceAdd(
+                        TileScrollingSystem.HIDDEN_MATRIX,
+                        isLastInstance
+                    );
                 }
             }
         }
@@ -134,9 +138,8 @@ export class TileScrollingSystem extends SystemBase {
             return;
         }
 
-        // Each lane: 65 % chance of having a tile
         for (let i = 0; i < row.enabled.length; i++) {
-            row.enabled[i] = rng.getUniform() < 0.65;
+            row.enabled[i] = rng.getUniform() < this.tileChance;
         }
 
         // Guarantee at least 2 tiles per row
@@ -151,7 +154,9 @@ export class TileScrollingSystem extends SystemBase {
             for (const idx of order) {
                 if (!row.enabled[idx]) {
                     row.enabled[idx] = true;
-                    if (++count >= 2) { break; }
+                    if (++count >= 2) {
+                        break;
+                    }
                 }
             }
         }
@@ -170,9 +175,17 @@ export class TileScrollingSystem extends SystemBase {
             const isLast = refresh && lane === LANE_X.length - 1;
             if (row.enabled[lane]) {
                 Matrix.TranslationToRef(LANE_X[lane], TILE_Y, row.z, this.tmpMatrix);
-                this.tileMesh.thinInstanceSetMatrixAt(this.instanceIndex(rowIndex, lane), this.tmpMatrix, isLast);
+                this.tileMesh.thinInstanceSetMatrixAt(
+                    this.instanceIndex(rowIndex, lane),
+                    this.tmpMatrix,
+                    isLast
+                );
             } else {
-                this.tileMesh.thinInstanceSetMatrixAt(this.instanceIndex(rowIndex, lane), TileScrollingSystem.HIDDEN_MATRIX, isLast);
+                this.tileMesh.thinInstanceSetMatrixAt(
+                    this.instanceIndex(rowIndex, lane),
+                    TileScrollingSystem.HIDDEN_MATRIX,
+                    isLast
+                );
             }
         }
     }
@@ -199,7 +212,9 @@ export class TileScrollingSystem extends SystemBase {
         // Find the true minimum Z only after all rows have moved.
         let minZ = Number.POSITIVE_INFINITY;
         for (const row of this.rows) {
-            if (row.z < minZ) { minZ = row.z; }
+            if (row.z < minZ) {
+                minZ = row.z;
+            }
         }
 
         // -={ Pass 2: recycle and sync matrices }=──────────────────────────._
@@ -216,6 +231,9 @@ export class TileScrollingSystem extends SystemBase {
             // Sync all lane matrices for this row; flush GPU buffer on last row
             this.syncRowMatrices(r, r === this.rows.length - 1);
         }
+
+        //  this.speed += deltaTime * 0.1;
+        //  this.tileChance -= deltaTime * 0.1;
     }
 
     // -={ Public API }=─────────────────────────────────────────────────────._
