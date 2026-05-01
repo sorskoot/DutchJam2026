@@ -52,6 +52,16 @@ export class TileScrollingSystem extends SystemBase {
     private readonly rows: TileRow[] = [];
     /** The single shared box mesh rendered via thin instances. */
     private readonly tileMesh: Mesh;
+    /** Per-instance RGBA color buffer (r,g,b,a) packed as floats. Length = rows * lanes * 4. */
+    private readonly colorBuffer: Float32Array;
+
+    /** Palette of selectable tile colors. Consumers may assign any {@link Color3} values. */
+    public palette: Color3[] = [
+        new Color3(0.15, 0.45, 0.95), // blue
+        new Color3(0.95, 0.45, 0.15), // orange
+        new Color3(0.15, 0.95, 0.45), // green
+        new Color3(0.95, 0.95, 0.2), // yellowa
+    ];
 
     // -={ Thin-instance helpers }=──────────────────────────────────────────._
     /** Zero matrix — scales a thin instance to nothing, effectively hiding it. */
@@ -69,9 +79,9 @@ export class TileScrollingSystem extends SystemBase {
 
         // -={ Material }=───────────────────────────────────────────────────._
         const mat = new StandardMaterial('tileMat', scene);
-        mat.diffuseColor = new Color3(0.15, 0.45, 0.95);
-        mat.specularColor = new Color3(0.4, 0.6, 1.0);
-        mat.emissiveColor = new Color3(0.05, 0.15, 0.35);
+        mat.diffuseColor = new Color3(1, 1, 1);
+        // mat.specularColor = new Color3(0.4, 0.6, 1.0);
+        // mat.emissiveColor = new Color3(0.05, 0.15, 0.35);
 
         // -={ Master mesh }=────────────────────────────────────────────────._
         // One box mesh – rendered N times via thin instances (1 draw call).
@@ -82,6 +92,17 @@ export class TileScrollingSystem extends SystemBase {
         );
         this.tileMesh.material = mat;
         this.tileMesh.isPickable = false;
+        // Enable per-instance colors on the material. Thin-instance color attribute will be uploaded to the GPU.
+        // mat.useVertexColor = true;
+
+        // Allocate the per-instance color buffer and initialize to fully-transparent (hidden) values.
+        this.colorBuffer = new Float32Array(NUM_ROWS * LANE_X.length * 4);
+        for (let i = 0; i < this.colorBuffer.length; i += 4) {
+            this.colorBuffer[i] = 0;
+            this.colorBuffer[i + 1] = 0;
+            this.colorBuffer[i + 2] = 0;
+            this.colorBuffer[i + 3] = 0; // alpha 0 hides the tile when using vertex colors
+        }
         // -={ Row initialization }=─────────────────────────────────────────._
         for (let r = 0; r < NUM_ROWS; r++) {
             const rowZ = -(r * ROW_SPACING);
@@ -99,14 +120,23 @@ export class TileScrollingSystem extends SystemBase {
                 if (row.enabled[lane]) {
                     Matrix.TranslationToRef(LANE_X[lane], TILE_Y, row.z, this.tmpMatrix);
                     this.tileMesh.thinInstanceAdd(this.tmpMatrix, isLastInstance);
+                    // assign a color for this enabled slot
+                    this.writeColorToBuffer(r, lane, this.pickColorForRow(), 1);
                 } else {
                     this.tileMesh.thinInstanceAdd(
                         TileScrollingSystem.HIDDEN_MATRIX,
                         isLastInstance
                     );
+                    // keep transparent color for hidden instances
                 }
             }
         }
+        // Upload the initial per-instance color buffer to the GPU. Attribute name 'color' is used by the StandardMaterial
+        // when useVertexColor = true. Stride=4 (r,g,b,a).
+        // NOTE: BabylonJS exposes thinInstanceSetBuffer(name, array, size) for thin-instance per-attribute uploads.
+        // If your Babylon version differs, adapt the attribute name/API accordingly.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (this.tileMesh as any).thinInstanceSetBuffer('color', this.colorBuffer, 4);
     }
 
     // -={ Helpers }=────────────────────────────────────────────────────────._
@@ -135,6 +165,10 @@ export class TileScrollingSystem extends SystemBase {
 
         if (forceAll) {
             row.enabled.fill(true);
+            // assign colors for newly enabled slots
+            for (let lane = 0; lane < row.enabled.length; lane++) {
+                this.writeColorToBuffer(rowIndex, lane, this.pickColorForRow(), 1);
+            }
             return;
         }
 
@@ -160,6 +194,14 @@ export class TileScrollingSystem extends SystemBase {
                 }
             }
         }
+        // Ensure color buffer is consistent with enabled flags for this row.
+        for (let lane = 0; lane < row.enabled.length; lane++) {
+            if (row.enabled[lane]) {
+                this.writeColorToBuffer(rowIndex, lane, this.pickColorForRow(), 1);
+            } else {
+                this.writeColorToBuffer(rowIndex, lane, new Color3(0, 0, 0), 0);
+            }
+        }
     }
 
     /**
@@ -180,14 +222,53 @@ export class TileScrollingSystem extends SystemBase {
                     this.tmpMatrix,
                     isLast
                 );
+                // ensure visible instances have opaque color; preserve any palette color already written
+                // (color values are kept in this.colorBuffer and re-uploaded in bulk below when refresh=true)
             } else {
                 this.tileMesh.thinInstanceSetMatrixAt(
                     this.instanceIndex(rowIndex, lane),
                     TileScrollingSystem.HIDDEN_MATRIX,
                     isLast
                 );
+                // mark hidden instances as transparent in the color buffer
+                this.writeColorToBuffer(rowIndex, lane, new Color3(0, 0, 0), 0);
             }
         }
+        // When requested, push the color buffer to the GPU once per-frame to avoid many small uploads.
+        if (refresh) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (this.tileMesh as any).thinInstanceSetBuffer('color', this.colorBuffer, 4);
+        }
+    }
+
+    /**
+     * Writes a color into the per-instance color buffer for a specific row/lane slot.
+     * Does not upload to the GPU immediately — callers should trigger an upload via {@link syncRowMatrices} (refresh=true)
+     * or rely on the next frame's bulk upload.
+     *
+     * @param row - Row index.
+     * @param lane - Lane index.
+     * @param color - RGB color to write.
+     * @param alpha - Alpha channel (0 transparent, 1 opaque).
+     */
+    private writeColorToBuffer(
+        row: number,
+        lane: number,
+        color: Color3,
+        alpha: number
+    ): void {
+        const base = (this.instanceIndex(row, lane) * 4) | 0;
+        this.colorBuffer[base] = color.r;
+        this.colorBuffer[base + 1] = color.g;
+        this.colorBuffer[base + 2] = color.b;
+        this.colorBuffer[base + 3] = alpha;
+    }
+
+    /**
+     * Picks a color for a given row using the seeded RNG and the current {@link palette}.
+     */
+    private pickColorForRow(): Color3 {
+        return rng.getItem(this.palette)!;
     }
 
     // -={ SystemBase }=─────────────────────────────────────────────────────._
