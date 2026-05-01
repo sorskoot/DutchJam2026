@@ -2,12 +2,12 @@ import {AdvancedDynamicTexture, Control} from '@babylonjs/gui';
 import type {GameScene} from '@sorskoot/babylon-kit';
 
 import type {PlayerObject} from '../entities/PlayerObject.ts';
+import type {ScoreSystem} from './ScoreSystem.ts';
 import {gameSystems, SystemBase} from './SystemBase.ts';
 import type {TileScrollingSystem} from './TileScrollingSystem.ts';
-import type {ScoreSystem} from './ScoreSystem.ts';
 
 /** Possible states the game can be in during a session. */
-export type GameState = 'playing' | 'dead';
+export type GameState = 'title' | 'playing' | 'dead';
 
 /**
  * Tracks the overall game state and shows a game-over overlay when the player
@@ -24,11 +24,16 @@ export type GameState = 'playing' | 'dead';
  */
 export class GameStateSystem extends SystemBase {
     /** Current game state; read externally by {@link MainScene} and {@link PlayerObject}. */
-    public state: GameState = 'playing';
+    // Start at the title screen so systems (tiles, player, etc.) remain paused
+    // until the player presses Play. Previously this defaulted to 'playing'
+    // which caused the world to start moving immediately on scene load.
+    public state: GameState = 'title';
 
     private gameScene: GameScene;
     private gameOverGui!: AdvancedDynamicTexture;
+    private titleGui!: AdvancedDynamicTexture;
     private gameOverRestartButton!: Control;
+    private titlePlayButton!: Control;
 
     /**
      * Creates a new {@link GameStateSystem}.
@@ -50,6 +55,13 @@ export class GameStateSystem extends SystemBase {
         this.gameOverGui.rootContainer.isVisible = false;
         this.gameOverRestartButton = this.gameOverGui.getControlByName('btnRestart')!;
         this.gameOverRestartButton.onPointerClickObservable.add(this.reset);
+
+        this.titleGui = await AdvancedDynamicTexture.ParseFromFileAsync(
+            'assets/gui/guiTitle.json'
+        );
+
+        this.titlePlayButton = this.titleGui.getControlByName('btnPlay')!;
+        this.titlePlayButton.onPointerClickObservable.add(this.reset);
     }
 
     /**
@@ -63,7 +75,8 @@ export class GameStateSystem extends SystemBase {
         this.state = 'dead';
         this.showOverlay();
         // Log final score to console for now (UI is a work in progress).
-        const score = (gameSystems.get('score') as ScoreSystem | undefined)?.getScore() ?? 0;
+        const score =
+            (gameSystems.get('score') as ScoreSystem | undefined)?.getScore() ?? 0;
         // eslint-disable-next-line no-console
         console.log(`Game Over — Score: ${score}`);
     }
@@ -75,6 +88,7 @@ export class GameStateSystem extends SystemBase {
     public reset = (): void => {
         this.state = 'playing';
         this.gameOverGui.rootContainer.isVisible = false;
+        this.titleGui.rootContainer.isVisible = false;
 
         const tileSystem = gameSystems.get('tiles') as TileScrollingSystem | undefined;
         tileSystem?.reset();

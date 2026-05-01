@@ -177,16 +177,16 @@ Basic scrolling tile grid, player sphere that can change lanes and jump, fall de
 - [x] Add lane-change + jump input
 - [x] Add fake gravity + fall detection
 - [x] Add game-over state
-- [ ] Add score system (distance traveled)
+- [x] Add score system (distance traveled)
 - [ ] Add speed ramp-up over time
-- [ ] Add procedural gap generation (increasing difficulty)
+- [x] Add procedural gap generation (increasing difficulty)
 - [ ] Add special tile types (boost, crumble)
-- [ ] Add Babylon GUI to replace DOM game-over overlay
+- [x] Add Babylon GUI to replace DOM game-over overlay
 - [ ] Add jump + land particle effects
 - [ ] Add camera bob on landing
 - [ ] Add speed-lines overlay at high speed
 - [ ] Add basic sound effects
-- [ ] Add title screen + restart button
+- [x] Add title screen + restart button
 - [ ] Polish visual palette / skybox
 - [ ] Balance difficulty curve
 - [ ] Set up Itch.io page

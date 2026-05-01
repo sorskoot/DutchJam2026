@@ -99,7 +99,7 @@ export class PlayerObject extends GameObject {
     public onUpdate(deltaTime: number): void {
         // Skip when dead
         const stateSystem = gameSystems.get('gameState') as GameStateSystem | undefined;
-        if (stateSystem?.state === 'dead') {
+        if (stateSystem?.state !== 'playing') {
             return;
         }
 

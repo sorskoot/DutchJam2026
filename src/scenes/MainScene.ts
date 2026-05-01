@@ -94,9 +94,8 @@ export class MainScene extends GameScene {
     override update(deltaTime: number): void {
         super.update(deltaTime);
 
-        // Freeze all systems once the player is dead
         const stateSystem = gameSystems.get('gameState') as GameStateSystem | undefined;
-        if (stateSystem?.state === 'dead') {
+        if (stateSystem?.state !== 'playing') {
             return;
         }
 
