@@ -1,6 +1,7 @@
 import {Color3, Matrix, Mesh, MeshBuilder, Scene, StandardMaterial} from '@babylonjs/core';
 import {rng} from '../utils/rng.ts';
-import {SystemBase} from './SystemBase.ts';
+import {SystemBase, gameSystems} from './SystemBase.ts';
+import type {ScoreSystem} from './ScoreSystem.ts';
 
 /** X center of each of the 5 lanes. */
 const LANE_X: readonly number[] = [-8, -4, 0, 4, 8];
@@ -172,6 +173,9 @@ export class TileScrollingSystem extends SystemBase {
                 row.z = minZ - ROW_SPACING;
                 minZ = row.z;
                 this.applyPattern(r, false);
+                // Inform the score system that the player has passed a row.
+                const score = gameSystems.get('score') as ScoreSystem | undefined;
+                score?.addRows(1);
             }
 
             // Sync all lane matrices for this row; flush GPU buffer on last row

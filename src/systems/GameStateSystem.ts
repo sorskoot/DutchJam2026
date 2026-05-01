@@ -4,6 +4,7 @@ import type {GameScene} from '@sorskoot/babylon-kit';
 import type {PlayerObject} from '../entities/PlayerObject.ts';
 import {gameSystems, SystemBase} from './SystemBase.ts';
 import type {TileScrollingSystem} from './TileScrollingSystem.ts';
+import type {ScoreSystem} from './ScoreSystem.ts';
 
 /** Possible states the game can be in during a session. */
 export type GameState = 'playing' | 'dead';
@@ -61,6 +62,10 @@ export class GameStateSystem extends SystemBase {
         }
         this.state = 'dead';
         this.showOverlay();
+        // Log final score to console for now (UI is a work in progress).
+        const score = (gameSystems.get('score') as ScoreSystem | undefined)?.getScore() ?? 0;
+        // eslint-disable-next-line no-console
+        console.log(`Game Over — Score: ${score}`);
     }
 
     /**
@@ -73,6 +78,9 @@ export class GameStateSystem extends SystemBase {
 
         const tileSystem = gameSystems.get('tiles') as TileScrollingSystem | undefined;
         tileSystem?.reset();
+
+        const scoreSystem = gameSystems.get('score') as ScoreSystem | undefined;
+        scoreSystem?.reset();
 
         const player = this.gameScene.getGameObject('Player') as PlayerObject | undefined;
         player?.reset();
