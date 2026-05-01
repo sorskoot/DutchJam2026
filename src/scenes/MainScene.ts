@@ -48,7 +48,7 @@ export class MainScene extends GameScene {
         // -={ Camera }=──────────────────────────────────────────────────────────._
         // Positioned above-and-behind the player (z=0), looking forward (-Z).
         this.camera = new FreeCamera('mainCamera', new Vector3(0, 8, 10), this.scene);
-        this.camera.setTarget(new Vector3(0, 0, -15));
+        this.camera.setTarget(new Vector3(0, 0, -6));
 
         const background = new Layer(
             'bg',
