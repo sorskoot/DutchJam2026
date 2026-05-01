@@ -1,4 +1,11 @@
-import {Color3, FreeCamera, HemisphericLight, Vector3} from '@babylonjs/core';
+import {
+    Color3,
+    Color4,
+    FreeCamera,
+    HemisphericLight,
+    Layer,
+    Vector3,
+} from '@babylonjs/core';
 import {type Game, GameScene, Key} from '@sorskoot/babylon-kit';
 import {PlayerObject} from '../entities/PlayerObject.ts';
 import {GameStateSystem} from '../systems/GameStateSystem.ts';
@@ -42,6 +49,14 @@ export class MainScene extends GameScene {
         // Positioned above-and-behind the player (z=0), looking forward (-Z).
         this.camera = new FreeCamera('mainCamera', new Vector3(0, 8, 10), this.scene);
         this.camera.setTarget(new Vector3(0, 0, -15));
+
+        const background = new Layer(
+            'bg',
+            'assets/background/Space002.png',
+            this.scene,
+            true
+        );
+        background.color = new Color4(1, 0, 1, 1);
 
         // IBL source so materials aren't pitch-black
         this.scene.createDefaultEnvironment({
