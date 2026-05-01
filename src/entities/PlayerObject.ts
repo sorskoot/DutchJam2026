@@ -18,6 +18,10 @@ const LANE_LERP_SPEED = 10; // fraction-of-gap applied per second (1/0.1 s)
 const TILE_HALF_W = 2; // tile width 4  → half = 2
 const TILE_HALF_D = 3; // tile depth 6  → half = 3
 const LAND_TOLERANCE = 0.8; // how far below tile top we still snap up
+// When the player first falls below `KILL_Y` we enter a dying state and allow
+// the sphere to continue falling until it passes this Y value, ensuring it
+// visibly disappears off-screen before the game-over overlay appears.
+const OUT_OF_SCREEN_Y = -12;
 
 /**
  * The player-controlled sphere.
@@ -40,6 +44,8 @@ export class PlayerObject extends GameObject {
 
     private verticalVelocity: number = 0;
     private isGrounded: boolean = false;
+    /** Set when the player has missed tiles and is falling to death. */
+    private isDying: boolean = false;
 
     private currentLaneIndex: number = START_LANE;
     private targetLaneX: number = LANE_X[START_LANE];
@@ -80,6 +86,7 @@ export class PlayerObject extends GameObject {
         this.lerpX = LANE_X[START_LANE];
         this.verticalVelocity = 0;
         this.isGrounded = false;
+        this.isDying = false;
         this.position = new Vector3(LANE_X[START_LANE], START_Y, 0);
     }
 
@@ -93,6 +100,22 @@ export class PlayerObject extends GameObject {
         // Skip when dead
         const stateSystem = gameSystems.get('gameState') as GameStateSystem | undefined;
         if (stateSystem?.state === 'dead') {
+            return;
+        }
+
+        // If the player already missed the tiles, enter a "dying" free-fall
+        // mode: keep applying gravity and don't allow further input/landing
+        // checks. Trigger game over only after the sphere falls sufficiently
+        // far off-screen.
+        if (this.isDying) {
+            // Continue accumulating gravity and vertical movement.
+            this.verticalVelocity += this.fakeGravity * deltaTime;
+            this.position.y += this.verticalVelocity * deltaTime;
+
+            if (this.position.y < OUT_OF_SCREEN_Y) {
+                stateSystem?.triggerGameOver();
+            }
+
             return;
         }
 
@@ -159,7 +182,14 @@ export class PlayerObject extends GameObject {
 
         // ── 5. Fall / game-over detection ──────────────────────────────────
         if (this.position.y < KILL_Y) {
-            stateSystem?.triggerGameOver();
+            // Start the dying fall instead of immediately ending the game so
+            // the player visibly falls out of the viewport first.
+            this.isDying = true;
+            // Ensure we are considered airborne and allow gravity to take over
+            // from here on.
+            this.isGrounded = false;
+            // Reset any upward velocity so the fall is consistent.
+            this.verticalVelocity = Math.min(this.verticalVelocity, 0);
         }
     }
 }

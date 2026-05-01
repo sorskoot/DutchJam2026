@@ -4,6 +4,7 @@ import {
     FreeCamera,
     HemisphericLight,
     Layer,
+    Scene,
     Vector3,
 } from '@babylonjs/core';
 import {type Game, GameScene, Key} from '@sorskoot/babylon-kit';
@@ -63,6 +64,12 @@ export class MainScene extends GameScene {
             createGround: false,
             createSkybox: false,
         });
+
+        // -={ Fog }=─────────────────────────────────────────────────────────────._
+        this.scene.fogMode = Scene.FOGMODE_EXP;
+        this.scene.fogColor = new Color3(0.0, 0.0, 0.0);
+        this.scene.fogDensity = 0.02;
+
         // -={ Lighting }=────────────────────────────────────────────────────────._
         const light = new HemisphericLight('mainLight', new Vector3(0, 1, 0), this.scene);
         light.groundColor = new Color3(0.3, 0.3, 0.3);
