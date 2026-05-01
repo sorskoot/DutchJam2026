@@ -12,7 +12,7 @@ const TILE_Y = 0; // tile mesh center Y (top = +0.25)
 
 const NUM_ROWS = 32;
 const ROW_SPACING = 6; // tile depth (4) + 2-unit gap
-const INITIAL_SPEED = 12; // world units / second
+const INITIAL_SPEED = 20; // world units / second
 const INITIAL_TILE_CHANCE = 0.65; // initial chance for a tile to appear in a lane
 const RECYCLE_THRESHOLD = 8; // recycle a row when its Z exceeds this
 const SAFE_ROWS = 6; // first N rows start fully filled
@@ -44,17 +44,11 @@ interface TileRow {
  * Gaps are generated randomly each time a row is recycled.
  */
 export class TileScrollingSystem extends SystemBase {
+    // -={ Thin-instance helpers }=──────────────────────────────────────────._
+    /** Zero matrix — scales a thin instance to nothing, effectively hiding it. */
+    private static readonly HIDDEN_MATRIX: Matrix = Matrix.Zero();
     /** Scroll speed in world units/s — increase over time for difficulty ramp. */
     public speed: number = INITIAL_SPEED;
-    private tileChance = INITIAL_TILE_CHANCE;
-
-    /** Pool of row state objects, one per logical tile row. */
-    private readonly rows: TileRow[] = [];
-    /** The single shared box mesh rendered via thin instances. */
-    private readonly tileMesh: Mesh;
-    /** Per-instance RGBA color buffer (r,g,b,a) packed as floats. Length = rows * lanes * 4. */
-    private readonly colorBuffer: Float32Array;
-
     /** Palette of selectable tile colors. Consumers may assign any {@link Color3} values. */
     public palette: Color3[] = [
         new Color3(0.15, 0.45, 0.95), // blue
@@ -62,10 +56,13 @@ export class TileScrollingSystem extends SystemBase {
         new Color3(0.15, 0.95, 0.45), // green
         new Color3(0.95, 0.95, 0.2), // yellowa
     ];
-
-    // -={ Thin-instance helpers }=──────────────────────────────────────────._
-    /** Zero matrix — scales a thin instance to nothing, effectively hiding it. */
-    private static readonly HIDDEN_MATRIX: Matrix = Matrix.Zero();
+    private tileChance = INITIAL_TILE_CHANCE;
+    /** Pool of row state objects, one per logical tile row. */
+    private readonly rows: TileRow[] = [];
+    /** The single shared box mesh rendered via thin instances. */
+    private readonly tileMesh: Mesh;
+    /** Per-instance RGBA color buffer (r,g,b,a) packed as floats. Length = rows * lanes * 4. */
+    private readonly colorBuffer: Float32Array;
     /** Scratch matrix used in hot paths to avoid per-frame allocations. */
     private readonly tmpMatrix: Matrix = Matrix.Identity();
 
@@ -142,6 +139,86 @@ export class TileScrollingSystem extends SystemBase {
     // -={ Helpers }=────────────────────────────────────────────────────────._
 
     /**
+     * Advances all tile rows by {@link speed} * deltaTime, recycling any row
+     * that scrolls past {@link RECYCLE_THRESHOLD} and assigning a new gap pattern.
+     *
+     * Two-pass approach: all rows are moved first so that {@link minZ} reflects
+     * the true post-movement back position before any recycled row is placed.
+     * Computing minZ from pre-movement positions would place recycled rows one
+     * `speed * deltaTime` step too far back, creating a growing visual gap.
+     *
+     * @param deltaTime - Elapsed time in seconds since the last frame.
+     */
+    override update(deltaTime: number): void {
+        // -={ Pass 1: advance all rows }=───────────────────────────────────._
+        for (const row of this.rows) {
+            row.z += this.speed * deltaTime;
+        }
+
+        // Find the true minimum Z only after all rows have moved.
+        let minZ = Number.POSITIVE_INFINITY;
+        for (const row of this.rows) {
+            if (row.z < minZ) {
+                minZ = row.z;
+            }
+        }
+
+        // -={ Pass 2: recycle and sync matrices }=──────────────────────────._
+        for (let r = 0; r < this.rows.length; r++) {
+            const row = this.rows[r];
+
+            if (row.z > RECYCLE_THRESHOLD) {
+                // Push row to the back and generate a new gap pattern
+                row.z = minZ - ROW_SPACING;
+                minZ = row.z;
+                this.applyPattern(r, false);
+            }
+
+            // Sync all lane matrices for this row; flush GPU buffer on last row
+            this.syncRowMatrices(r, r === this.rows.length - 1);
+        }
+
+        //  this.speed += deltaTime * 0.1;
+        //  this.tileChance -= deltaTime * 0.1;
+    }
+
+    /**
+     * Resets all rows to their initial positions and restores the starting speed.
+     * Call this when restarting the game without reloading the page.
+     */
+    public reset(): void {
+        this.speed = INITIAL_SPEED;
+
+        for (let r = 0; r < this.rows.length; r++) {
+            this.rows[r].z = -(r * ROW_SPACING);
+            this.applyPattern(r, r < SAFE_ROWS);
+            this.syncRowMatrices(r, r === this.rows.length - 1);
+        }
+    }
+
+    /**
+     * Returns the world-space center of every currently visible tile.
+     * Used by {@link PlayerObject} for AABB landing checks.
+     *
+     * @returns Array of {@link TilePoint} objects, one per enabled tile slot.
+     */
+    public getActiveTiles(): TilePoint[] {
+        const result: TilePoint[] = [];
+        for (const row of this.rows) {
+            for (let lane = 0; lane < LANE_X.length; lane++) {
+                if (row.enabled[lane]) {
+                    result.push({
+                        worldX: LANE_X[lane],
+                        worldY: TILE_Y,
+                        worldZ: row.z,
+                    });
+                }
+            }
+        }
+        return result;
+    }
+
+    /**
      * Returns the flat thin-instance index for a given row/lane pair.
      *
      * @param row - Zero-based row index into {@link rows}.
@@ -204,6 +281,8 @@ export class TileScrollingSystem extends SystemBase {
         }
     }
 
+    // -={ SystemBase }=─────────────────────────────────────────────────────._
+
     /**
      * Pushes the current Z and enabled state of one row into the thin-instance
      * matrix buffer.
@@ -241,6 +320,8 @@ export class TileScrollingSystem extends SystemBase {
         }
     }
 
+    // -={ Public API }=─────────────────────────────────────────────────────._
+
     /**
      * Writes a color into the per-instance color buffer for a specific row/lane slot.
      * Does not upload to the GPU immediately — callers should trigger an upload via {@link syncRowMatrices} (refresh=true)
@@ -269,89 +350,5 @@ export class TileScrollingSystem extends SystemBase {
      */
     private pickColorForRow(): Color3 {
         return rng.getItem(this.palette)!;
-    }
-
-    // -={ SystemBase }=─────────────────────────────────────────────────────._
-
-    /**
-     * Advances all tile rows by {@link speed} * deltaTime, recycling any row
-     * that scrolls past {@link RECYCLE_THRESHOLD} and assigning a new gap pattern.
-     *
-     * Two-pass approach: all rows are moved first so that {@link minZ} reflects
-     * the true post-movement back position before any recycled row is placed.
-     * Computing minZ from pre-movement positions would place recycled rows one
-     * `speed * deltaTime` step too far back, creating a growing visual gap.
-     *
-     * @param deltaTime - Elapsed time in seconds since the last frame.
-     */
-    override update(deltaTime: number): void {
-        // -={ Pass 1: advance all rows }=───────────────────────────────────._
-        for (const row of this.rows) {
-            row.z += this.speed * deltaTime;
-        }
-
-        // Find the true minimum Z only after all rows have moved.
-        let minZ = Number.POSITIVE_INFINITY;
-        for (const row of this.rows) {
-            if (row.z < minZ) {
-                minZ = row.z;
-            }
-        }
-
-        // -={ Pass 2: recycle and sync matrices }=──────────────────────────._
-        for (let r = 0; r < this.rows.length; r++) {
-            const row = this.rows[r];
-
-            if (row.z > RECYCLE_THRESHOLD) {
-                // Push row to the back and generate a new gap pattern
-                row.z = minZ - ROW_SPACING;
-                minZ = row.z;
-                this.applyPattern(r, false);
-            }
-
-            // Sync all lane matrices for this row; flush GPU buffer on last row
-            this.syncRowMatrices(r, r === this.rows.length - 1);
-        }
-
-        //  this.speed += deltaTime * 0.1;
-        //  this.tileChance -= deltaTime * 0.1;
-    }
-
-    // -={ Public API }=─────────────────────────────────────────────────────._
-
-    /**
-     * Resets all rows to their initial positions and restores the starting speed.
-     * Call this when restarting the game without reloading the page.
-     */
-    public reset(): void {
-        this.speed = INITIAL_SPEED;
-
-        for (let r = 0; r < this.rows.length; r++) {
-            this.rows[r].z = -(r * ROW_SPACING);
-            this.applyPattern(r, r < SAFE_ROWS);
-            this.syncRowMatrices(r, r === this.rows.length - 1);
-        }
-    }
-
-    /**
-     * Returns the world-space center of every currently visible tile.
-     * Used by {@link PlayerObject} for AABB landing checks.
-     *
-     * @returns Array of {@link TilePoint} objects, one per enabled tile slot.
-     */
-    public getActiveTiles(): TilePoint[] {
-        const result: TilePoint[] = [];
-        for (const row of this.rows) {
-            for (let lane = 0; lane < LANE_X.length; lane++) {
-                if (row.enabled[lane]) {
-                    result.push({
-                        worldX: LANE_X[lane],
-                        worldY: TILE_Y,
-                        worldZ: row.z,
-                    });
-                }
-            }
-        }
-        return result;
     }
 }
