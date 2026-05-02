@@ -6,18 +6,21 @@ export default () => {
             port: 4623,
             host: '0.0.0.0',
         },
-        // base: './',
-        // build: {
-        //     target: 'esnext',
-        //     modulePreload: false,
-        //     cssCodeSplit: false,
-        //     assetsInlineLimit: 0,
-        //     chunkSizeWarningLimit: 10 * 1024 * 1024,
-        //     rolldownOptions: {
-        //         output: {
-        //             codeSplitting: false,
-        //         },
-        //     },
-        // },
+        base: './',
+        // publicDir: './public',
+        // assetsInclude: ['assets/*.*'],
+        build: {
+            target: 'esnext',
+            // copyPublicDir: true,
+            // modulePreload: false,
+            // cssCodeSplit: false,
+            //assetsInlineLimit: 0,
+            chunkSizeWarningLimit: 10 * 1024 * 1024,
+            rolldownOptions: {
+                output: {
+                    codeSplitting: false,
+                },
+            },
+        },
     });
 };
