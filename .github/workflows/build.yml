@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-# TK: Commented below for now
-#    tags:
-#      - 'v*.*.*'
 
 concurrency:
   group: build-${{ github.ref }}
