@@ -8,6 +8,7 @@ import {
     Vector3,
 } from '@babylonjs/core';
 import {type Game, GameScene, Key} from '@sorskoot/babylon-kit';
+import {musicKeys, sfxKeys} from '../audio-types.ts';
 import {PlayerObject} from '../entities/PlayerObject.ts';
 import {GameStateSystem} from '../systems/GameStateSystem.ts';
 import {ScoreSystem} from '../systems/ScoreSystem.ts';
@@ -75,9 +76,28 @@ export class MainScene extends GameScene {
         light.groundColor = new Color3(0.3, 0.3, 0.3);
         light.intensity = 1;
 
+        // -={ Audio }=───────────────────────────────────────────────────────────._
+        await this.game.audioManager.initialize();
+        this.game.audioManager.setMusicVolume(0.5);
+        await this.game.audioManager.loadMusic(
+            musicKeys.menu,
+            'assets/music/DarkFantasyStudio-Startyourengine.mp3'
+        );
+        await this.game.audioManager.loadMusic(
+            musicKeys.game,
+            'assets/music/DarkFantasyStudio-Blackhole.mp3'
+        );
+        await this.game.audioManager.loadSfx(sfxKeys.die, 'assets/sfx/explosion.mp3');
+        await this.game.audioManager.loadSfx(sfxKeys.jump, 'assets/sfx/jump.mp3');
+        await this.game.audioManager.loadSfx(sfxKeys.land, 'assets/sfx/hitHurt.mp3');
+        await this.game.audioManager.loadSfx(sfxKeys.slide, 'assets/sfx/slide.mp3');
+        await this.game.audioManager.loadSfx(sfxKeys.click, 'assets/sfx/click.mp3');
+
+        this.game.audioManager.playMusic(musicKeys.menu);
+
         // -={ Systems }=─────────────────────────────────────────────────────────._
         // Register before addGameObject so the player can access them on start.
-        const gameStateSystem = new GameStateSystem(this);
+        const gameStateSystem = new GameStateSystem(this, this.game.audioManager);
 
         await gameSystems.register('gameState', gameStateSystem);
         await gameSystems.register('score', new ScoreSystem());

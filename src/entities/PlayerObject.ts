@@ -1,5 +1,11 @@
 import {Color3, MeshBuilder, StandardMaterial, Vector3} from '@babylonjs/core';
-import {type Game, GameObject, type GameScene} from '@sorskoot/babylon-kit';
+import {
+    type AudioManager,
+    type Game,
+    GameObject,
+    type GameScene,
+} from '@sorskoot/babylon-kit';
+import {sfxKeys} from '../audio-types.ts';
 import type {GameStateSystem} from '../systems/GameStateSystem.ts';
 import {gameSystems} from '../systems/SystemBase.ts';
 import type {TileScrollingSystem} from '../systems/TileScrollingSystem.ts';
@@ -51,6 +57,7 @@ export class PlayerObject extends GameObject {
     private targetLaneX: number = LANE_X[START_LANE];
     /** Smoothly interpolated X value written to the node each frame. */
     private lerpX: number = LANE_X[START_LANE];
+    private audioManager: AudioManager;
 
     /**
      * @param scene - The {@link GameScene} this object belongs to.
@@ -58,7 +65,7 @@ export class PlayerObject extends GameObject {
      */
     constructor(scene: GameScene, game: Game) {
         super('Player', game, scene);
-
+        this.audioManager = game.audioManager;
         const mesh = MeshBuilder.CreateSphere(
             'playerSphere',
             {diameter: 1},
@@ -128,6 +135,7 @@ export class PlayerObject extends GameObject {
 
         // ── 1. Jump / gravity ──────────────────────────────────────────────
         if (wasGrounded && input.isActionPressed('jump')) {
+            this.audioManager.playSfx(sfxKeys.jump);
             // Launch upward; gravity starts accumulating next frame.
             this.verticalVelocity = JUMP_IMPULSE;
         } else if (!wasGrounded) {
@@ -156,6 +164,9 @@ export class PlayerObject extends GameObject {
                     ) {
                         this.position.y = tileTop + PLAYER_RADIUS;
                         this.verticalVelocity = 0;
+                        if (!wasGrounded) {
+                            this.audioManager.playSfx(sfxKeys.land);
+                        }
                         this.isGrounded = true;
                         break;
                     }
@@ -165,11 +176,13 @@ export class PlayerObject extends GameObject {
 
         // ── 4. Lane movement (one lane per key-press) ──────────────────────
         if (input.isActionPressed('left') && this.currentLaneIndex < LANE_X.length - 1) {
+            this.audioManager.playSfx(sfxKeys.slide);
             // code looks like it's reverted, but it's not.
             this.currentLaneIndex++;
             this.targetLaneX = LANE_X[this.currentLaneIndex];
         }
         if (input.isActionPressed('right') && this.currentLaneIndex > 0) {
+            this.audioManager.playSfx(sfxKeys.slide);
             // code looks like it's reverted, but it's not.
             this.currentLaneIndex--;
             this.targetLaneX = LANE_X[this.currentLaneIndex];
@@ -182,6 +195,7 @@ export class PlayerObject extends GameObject {
 
         // ── 5. Fall / game-over detection ──────────────────────────────────
         if (this.position.y < KILL_Y) {
+            this.audioManager.playSfx(sfxKeys.die);
             // Start the dying fall instead of immediately ending the game so
             // the player visibly falls out of the viewport first.
             this.isDying = true;

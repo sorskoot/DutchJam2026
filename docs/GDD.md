@@ -179,13 +179,14 @@ Basic scrolling tile grid, player sphere that can change lanes and jump, fall de
 - [x] Add game-over state
 - [x] Add score system (distance traveled)
 - [ ] Add speed ramp-up over time
-- [x] Add procedural gap generation (increasing difficulty)
+- [x] Add procedural gap generation 
+  - [ ] increasing difficulty
 - [ ] Add special tile types (boost, crumble)
 - [x] Add Babylon GUI to replace DOM game-over overlay
 - [ ] Add jump + land particle effects
 - [ ] Add camera bob on landing
 - [ ] Add speed-lines overlay at high speed
-- [ ] Add basic sound effects
+- [x] Add basic sound effects
 - [x] Add title screen + restart button
 - [ ] Polish visual palette / skybox
 - [ ] Balance difficulty curve

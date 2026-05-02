@@ -1,5 +1,6 @@
 import {AdvancedDynamicTexture, Control} from '@babylonjs/gui';
-import type {GameScene} from '@sorskoot/babylon-kit';
+import {AudioManager, type GameScene} from '@sorskoot/babylon-kit';
+import {musicKeys, sfxKeys} from '../audio-types.ts';
 
 import type {PlayerObject} from '../entities/PlayerObject.ts';
 import type {ScoreSystem} from './ScoreSystem.ts';
@@ -29,7 +30,6 @@ export class GameStateSystem extends SystemBase {
     // which caused the world to start moving immediately on scene load.
     public state: GameState = 'title';
 
-    private gameScene: GameScene;
     private gameOverGui!: AdvancedDynamicTexture;
     private titleGui!: AdvancedDynamicTexture;
     private gameOverRestartButton!: Control;
@@ -38,10 +38,13 @@ export class GameStateSystem extends SystemBase {
     /**
      * Creates a new {@link GameStateSystem}.
      * @param gameScene - The {@link GameScene} that owns this system.
+     * @param audioManager - The {@link AudioManager} used to play music on state changes.
      */
-    constructor(gameScene: GameScene) {
+    constructor(
+        private gameScene: GameScene,
+        private audioManager: AudioManager
+    ) {
         super();
-        this.gameScene = gameScene;
     }
 
     /**
@@ -73,7 +76,7 @@ export class GameStateSystem extends SystemBase {
             return;
         }
         this.state = 'dead';
-        this.showOverlay();
+        this.showGameOverOverlay();
         // Log final score to console for now (UI is a work in progress).
         const score =
             (gameSystems.get('score') as ScoreSystem | undefined)?.getScore() ?? 0;
@@ -86,6 +89,7 @@ export class GameStateSystem extends SystemBase {
      * both the tile system and the player to their starting conditions.
      */
     public reset = (): void => {
+        this.audioManager.playSfx(sfxKeys.click);
         this.state = 'playing';
         this.gameOverGui.rootContainer.isVisible = false;
         this.titleGui.rootContainer.isVisible = false;
@@ -98,6 +102,8 @@ export class GameStateSystem extends SystemBase {
 
         const player = this.gameScene.getGameObject('Player') as PlayerObject | undefined;
         player?.reset();
+
+        this.audioManager.playMusic(musicKeys.game);
     };
 
     // -={ Internals }=──────────────────────────────────────────────────────._
@@ -106,7 +112,8 @@ export class GameStateSystem extends SystemBase {
     public override update(_delta: number): void {}
 
     /** Makes the game-over overlay visible. */
-    private showOverlay(): void {
+    private showGameOverOverlay(): void {
         this.gameOverGui.rootContainer.isVisible = true;
+        this.audioManager.playMusic(musicKeys.menu);
     }
 }
