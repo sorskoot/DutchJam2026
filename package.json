@@ -24,6 +24,6 @@
         "@babylonjs/gui": "^9.1.0",
         "@babylonjs/inspector": "^9.1.0",
         "@babylonjs/loaders": "^9.1.0",
-        "@sorskoot/babylon-kit": "file:../BJS-GameEngine/sorskoot-babylon-kit-0.1.2.tgz"
+        "@sorskoot/babylon-kit": "file:./lib/sorskoot-babylon-kit-0.1.2.tgz"
     }
 }
