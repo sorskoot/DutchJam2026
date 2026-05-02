@@ -2,8 +2,8 @@ name: Build and Deploy on Tag
 
 on:
   push:
-    branches:
-      - main
+#    branches:
+#      - main
     tags:
       - 'v*.*.*'
 concurrency:
