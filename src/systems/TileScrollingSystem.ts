@@ -1,4 +1,12 @@
-import {Color3, Matrix, Mesh, MeshBuilder, Scene, StandardMaterial} from '@babylonjs/core';
+import {
+    Color3,
+    Matrix,
+    Mesh,
+    MeshBuilder,
+    Scene,
+    StandardMaterial,
+    Texture,
+} from '@babylonjs/core';
 import {rng} from '../utils/rng.ts';
 import {SystemBase, gameSystems} from './SystemBase.ts';
 import type {ScoreSystem} from './ScoreSystem.ts';
@@ -7,7 +15,7 @@ import type {ScoreSystem} from './ScoreSystem.ts';
 const LANE_X: readonly number[] = [-8, -4, 0, 4, 8];
 
 const TILE_WIDTH = 4;
-const TILE_HEIGHT = 0.5;
+const TILE_HEIGHT = 0.05;
 const TILE_DEPTH = 6;
 const TILE_Y = 0; // tile mesh center Y (top = +0.25)
 
@@ -78,8 +86,11 @@ export class TileScrollingSystem extends SystemBase {
         // -={ Material }=───────────────────────────────────────────────────._
         const mat = new StandardMaterial('tileMat', scene);
         mat.diffuseColor = new Color3(1, 1, 1);
+        mat.opacityTexture = new Texture('assets/textures/outline.png', scene);
+        mat.emissiveTexture = new Texture('assets/textures/outline.png', scene);
+
         // mat.specularColor = new Color3(0.4, 0.6, 1.0);
-        // mat.emissiveColor = new Color3(0.05, 0.15, 0.35);
+        mat.emissiveColor = new Color3(0.3, 0.3, 0.3);
 
         // -={ Master mesh }=────────────────────────────────────────────────._
         // One box mesh – rendered N times via thin instances (1 draw call).
@@ -92,6 +103,9 @@ export class TileScrollingSystem extends SystemBase {
         this.tileMesh.isPickable = false;
         // Enable per-instance colors on the material. Thin-instance color attribute will be uploaded to the GPU.
         // mat.useVertexColor = true;
+        mat.opacityTexture.getAlphaFromRGB = true;
+        //   mat.alpha = 0.5; // transparency
+        mat.transparencyMode = StandardMaterial.MATERIAL_ALPHABLEND;
 
         // Allocate the per-instance color buffer and initialize to fully-transparent (hidden) values.
         this.colorBuffer = new Float32Array(NUM_ROWS * LANE_X.length * 4);
@@ -321,6 +335,7 @@ export class TileScrollingSystem extends SystemBase {
         if (refresh) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (this.tileMesh as any).thinInstanceSetBuffer('color', this.colorBuffer, 4);
+            (this.tileMesh as any).thinInstanceSetBuffer('emissive', this.colorBuffer, 4);
         }
     }
 

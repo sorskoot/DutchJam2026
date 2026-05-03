@@ -2,6 +2,7 @@ import {
     Color3,
     Color4,
     FreeCamera,
+    GlowLayer,
     HemisphericLight,
     Layer,
     Scene,
@@ -66,6 +67,9 @@ export class MainScene extends GameScene {
             createSkybox: false,
         });
 
+        const gl = new GlowLayer('glow', this.scene, {
+            mainTextureSamples: 4,
+        });
         // -={ Fog }=─────────────────────────────────────────────────────────────._
         this.scene.fogMode = Scene.FOGMODE_EXP;
         this.scene.fogColor = new Color3(0.0, 0.0, 0.0);
