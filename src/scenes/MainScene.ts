@@ -67,8 +67,8 @@ export class MainScene extends GameScene {
             createSkybox: false,
         });
 
-        const gl = new GlowLayer('glow', this.scene, {
-            mainTextureSamples: 4,
+        new GlowLayer('glow', this.scene, {
+            mainTextureSamples: 1,
         });
         // -={ Fog }=─────────────────────────────────────────────────────────────._
         this.scene.fogMode = Scene.FOGMODE_EXP;
