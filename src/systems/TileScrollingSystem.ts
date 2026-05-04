@@ -7,8 +7,9 @@ import {
     StandardMaterial,
     Texture,
 } from '@babylonjs/core';
+import {type GameScene, SystemBase} from '@sorskoot/babylon-kit';
 import {rng} from '../utils/rng.ts';
-import {SystemBase, gameSystems} from './SystemBase.ts';
+import type {GameStateSystem} from './GameStateSystem.ts';
 import type {ScoreSystem} from './ScoreSystem.ts';
 
 /** X center of each of the 5 lanes. */
@@ -80,7 +81,10 @@ export class TileScrollingSystem extends SystemBase {
      *
      * @param scene - The Babylon.js scene to create tile geometry in.
      */
-    constructor(scene: Scene) {
+    constructor(
+        private gameScene: GameScene,
+        scene: Scene
+    ) {
         super();
 
         // -={ Material }=───────────────────────────────────────────────────._
@@ -165,6 +169,12 @@ export class TileScrollingSystem extends SystemBase {
      * @param deltaTime - Elapsed time in seconds since the last frame.
      */
     override update(deltaTime: number): void {
+        const stateSystem = this.gameScene.getGame().systems.get('gameState') as
+            | GameStateSystem
+            | undefined;
+        if (stateSystem?.state !== 'playing') {
+            return;
+        }
         // -={ Pass 1: advance all rows }=───────────────────────────────────._
         for (const row of this.rows) {
             row.z += this.speed * deltaTime;
@@ -188,7 +198,9 @@ export class TileScrollingSystem extends SystemBase {
                 minZ = row.z;
                 this.applyPattern(r, false);
                 // Inform the score system that the player has passed a row.
-                const score = gameSystems.get('score') as ScoreSystem | undefined;
+                const score = this.gameScene.getGame().systems.get('score') as
+                    | ScoreSystem
+                    | undefined;
                 score?.addRows(1);
             }
 

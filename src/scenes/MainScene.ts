@@ -13,7 +13,6 @@ import {musicKeys, sfxKeys} from '../audio-types.ts';
 import {PlayerObject} from '../entities/PlayerObject.ts';
 import {GameStateSystem} from '../systems/GameStateSystem.ts';
 import {ScoreSystem} from '../systems/ScoreSystem.ts';
-import {gameSystems} from '../systems/SystemBase.ts';
 import {TileScrollingSystem} from '../systems/TileScrollingSystem.ts';
 
 /**
@@ -103,9 +102,12 @@ export class MainScene extends GameScene {
         // Register before addGameObject so the player can access them on start.
         const gameStateSystem = new GameStateSystem(this, this.game.audioManager);
 
-        await gameSystems.register('gameState', gameStateSystem);
-        await gameSystems.register('score', new ScoreSystem());
-        await gameSystems.register('tiles', new TileScrollingSystem(this.scene));
+        await this.game.systems.register('gameState', gameStateSystem);
+        await this.game.systems.register('score', new ScoreSystem());
+        await this.game.systems.register(
+            'tiles',
+            new TileScrollingSystem(this, this.scene)
+        );
 
         // -={ Player }=──────────────────────────────────────────────────────────._
         this.addGameObject('Player', new PlayerObject(this, this.game));
@@ -115,14 +117,5 @@ export class MainScene extends GameScene {
      * Per-frame update. Freezes all systems when the player is dead.
      * @param deltaTime - Elapsed time in seconds since the last frame.
      */
-    override update(deltaTime: number): void {
-        super.update(deltaTime);
-
-        const stateSystem = gameSystems.get('gameState') as GameStateSystem | undefined;
-        if (stateSystem?.state !== 'playing') {
-            return;
-        }
-
-        gameSystems.update(deltaTime);
-    }
+    override update(_deltaTime: number): void {}
 }

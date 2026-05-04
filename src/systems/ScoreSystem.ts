@@ -1,4 +1,4 @@
-import {SystemBase} from './SystemBase.ts';
+import {SystemBase} from '@sorskoot/babylon-kit';
 
 /**
  * Tracks the player's row-based score during a run and exposes a lightweight

@@ -7,7 +7,6 @@ import {
 } from '@sorskoot/babylon-kit';
 import {sfxKeys} from '../audio-types.ts';
 import type {GameStateSystem} from '../systems/GameStateSystem.ts';
-import {gameSystems} from '../systems/SystemBase.ts';
 import type {TileScrollingSystem} from '../systems/TileScrollingSystem.ts';
 
 /** X center of each lane in world space (5 lanes, 4 units apart). */
@@ -64,7 +63,7 @@ export class PlayerObject extends GameObject {
      * @param game  - The root {@link Game} instance.
      */
     constructor(scene: GameScene, game: Game) {
-        super('Player', game, scene);
+        super('Player', scene);
         this.audioManager = game.audioManager;
         const mesh = MeshBuilder.CreateSphere(
             'playerSphere',
@@ -105,7 +104,9 @@ export class PlayerObject extends GameObject {
      */
     public onUpdate(deltaTime: number): void {
         // Skip when dead
-        const stateSystem = gameSystems.get('gameState') as GameStateSystem | undefined;
+        const stateSystem = this.game.systems.get('gameState') as
+            | GameStateSystem
+            | undefined;
         if (stateSystem?.state !== 'playing') {
             return;
         }
@@ -126,7 +127,7 @@ export class PlayerObject extends GameObject {
             return;
         }
 
-        const input = this.scene.getInputManager();
+        const input = this.gameScene.getInputManager();
 
         // Snapshot grounded state from last frame then clear it; will be
         // re-set below if the AABB check finds a tile this frame.
@@ -150,7 +151,9 @@ export class PlayerObject extends GameObject {
         this.position.y += this.verticalVelocity * deltaTime;
 
         // ── 3. AABB tile landing (only when moving down or stationary) ─────
-        const tileSystem = gameSystems.get('tiles') as TileScrollingSystem | undefined;
+        const tileSystem = this.game.systems.get('tiles') as
+            | TileScrollingSystem
+            | undefined;
         if (tileSystem && this.verticalVelocity <= 0) {
             for (const tile of tileSystem.getActiveTiles()) {
                 const dx = Math.abs(this.position.x - tile.worldX);

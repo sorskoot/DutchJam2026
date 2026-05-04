@@ -1,10 +1,8 @@
 import {AdvancedDynamicTexture, Control} from '@babylonjs/gui';
-import {AudioManager, type GameScene} from '@sorskoot/babylon-kit';
+import {AudioManager, type GameScene, SystemBase} from '@sorskoot/babylon-kit';
 import {musicKeys, sfxKeys} from '../audio-types.ts';
-
 import type {PlayerObject} from '../entities/PlayerObject.ts';
 import type {ScoreSystem} from './ScoreSystem.ts';
-import {gameSystems, SystemBase} from './SystemBase.ts';
 import type {TileScrollingSystem} from './TileScrollingSystem.ts';
 
 /** Possible states the game can be in during a session. */
@@ -79,7 +77,9 @@ export class GameStateSystem extends SystemBase {
         this.showGameOverOverlay();
         // Log final score to console for now (UI is a work in progress).
         const score =
-            (gameSystems.get('score') as ScoreSystem | undefined)?.getScore() ?? 0;
+            (
+                this.gameScene.getGame().systems.get('score') as ScoreSystem | undefined
+            )?.getScore() ?? 0;
         // eslint-disable-next-line no-console
         console.log(`Game Over — Score: ${score}`);
     }
@@ -94,10 +94,14 @@ export class GameStateSystem extends SystemBase {
         this.gameOverGui.rootContainer.isVisible = false;
         this.titleGui.rootContainer.isVisible = false;
 
-        const tileSystem = gameSystems.get('tiles') as TileScrollingSystem | undefined;
+        const tileSystem = this.gameScene.getGame().systems.get('tiles') as
+            | TileScrollingSystem
+            | undefined;
         tileSystem?.reset();
 
-        const scoreSystem = gameSystems.get('score') as ScoreSystem | undefined;
+        const scoreSystem = this.gameScene.getGame().systems.get('score') as
+            | ScoreSystem
+            | undefined;
         scoreSystem?.reset();
 
         const player = this.gameScene.getGameObject('Player') as PlayerObject | undefined;
